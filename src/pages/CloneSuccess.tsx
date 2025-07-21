@@ -9,7 +9,6 @@ const CloneSuccess = () => {
   const navigate = useNavigate();
   const location = useLocation();
   
-  // Get the cloned product data from navigation state
   const { productData, sourceOrg, targetOrg } = location.state || {};
 
   const handleBackToClone = () => {
