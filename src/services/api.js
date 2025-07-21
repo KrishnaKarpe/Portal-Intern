@@ -1,4 +1,3 @@
-
 /**
  * API Service for frontend
  * Handles communication with the backend API
@@ -20,13 +19,13 @@ export const cloneProduct = async (productData) => {
       },
       body: JSON.stringify(productData),
     });
-    
+
     const data = await response.json();
-    
+
     if (!response.ok) {
       throw new Error(data.message || 'Failed to clone product');
     }
-    
+
     return data;
   } catch (error) {
     console.error('Error cloning product:', error);
@@ -48,13 +47,13 @@ export const updateProduct = async (productData) => {
       },
       body: JSON.stringify(productData),
     });
-    
+
     const data = await response.json();
-    
+
     if (!response.ok) {
       throw new Error(data.message || 'Failed to update product');
     }
-    
+
     return data;
   } catch (error) {
     console.error('Error updating product:', error);
@@ -69,13 +68,13 @@ export const updateProduct = async (productData) => {
 export const getOrganizations = async () => {
   try {
     const response = await fetch(`${API_URL}/products/organizations`);
-    
+
     const data = await response.json();
-    
+
     if (!response.ok) {
       throw new Error(data.message || 'Failed to fetch organizations');
     }
-    
+
     return data.data;
   } catch (error) {
     console.error('Error fetching organizations:', error);
@@ -91,13 +90,13 @@ export const getOrganizations = async () => {
 export const getProductsByOrganization = async (orgId) => {
   try {
     const response = await fetch(`${API_URL}/products/by-organization/${orgId}`);
-    
+
     const data = await response.json();
-    
+
     if (!response.ok) {
       throw new Error(data.message || 'Failed to fetch products');
     }
-    
+
     return data.data;
   } catch (error) {
     console.error('Error fetching products:', error);

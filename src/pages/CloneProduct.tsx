@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,15 +6,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
-import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
+import { cloneProduct as apiCloneProduct } from '@/services/api';
 
 const organizations = [
   { id: 1, name: 'apigee-prod-ouax' },
   { id: 2, name: 'apigee-non-prod-crjb' },
- 
 ];
 
 const CloneProduct = () => {
+  const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(false);
   const [sourceOrg, setSourceOrg] = useState("");
   const [targetOrg, setTargetOrg] = useState("");
   const [environments, setEnvironments] = useState('');
@@ -49,10 +50,23 @@ const CloneProduct = () => {
       toast.error('Product name fields are required');
       return;
     }
+
+    if (!formData.sourceToken || !formData.targetToken) {
+      toast.error('Both tokens are required');
+      return;
+    }
+    
+    setIsLoading(true);
     
     try {
-      toast.error('reached before calling');
-      const response = await axios.post('http://localhost:5000/api/clone-product', {
+      console.log('Submitting clone request with data:', {
+        sourceOrg,
+        targetOrg,
+        productName: formData.productName,
+        newProductName: formData.newProductName
+      });
+
+      const response = await apiCloneProduct({
         sourceOrg,
         targetOrg,
         sourceToken: formData.sourceToken,
@@ -64,14 +78,30 @@ const CloneProduct = () => {
         environments: environments.split(',').map(env => env.trim())
       });
 
-      if (response.data.success) {
+      console.log('Clone response:', response);
+
+      if (response.success) {
         toast.success('Product successfully cloned!');
+        console.log('Cloned product data:', response.data);
+        
+        // Redirect to success page with product data
+        navigate('/clone-success', {
+          state: {
+            productData: response.data,
+            sourceOrg,
+            targetOrg,
+            originalProductName: formData.productName,
+            newProductName: formData.newProductName
+          }
+        });
       } else {
-        toast.error('Failed to clone product');
+        toast.error(response.message || 'Failed to clone product');
       }
     } catch (error) {
       console.error('Error cloning product:', error);
-      toast.error('Failed to clone product');
+      toast.error(error.message || 'Failed to clone product');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -255,9 +285,10 @@ const CloneProduct = () => {
             <div className="pt-2">
               <Button 
                 type="submit" 
-                className="bg-navy hover:bg-navy-200 transition-colors duration-300"
+                disabled={isLoading}
+                className="bg-navy hover:bg-navy-200 transition-colors duration-300 disabled:opacity-50"
               >
-                Clone Product
+                {isLoading ? 'Cloning Product...' : 'Clone Product'}
               </Button>
             </div>
           </form>

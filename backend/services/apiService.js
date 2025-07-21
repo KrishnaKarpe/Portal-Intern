@@ -1,4 +1,3 @@
-
 /**
  * API Service - Handles external API communication
  * Responsible for making requests to the Apigee API
@@ -15,7 +14,12 @@ const axios = require('axios');
  */
 const fetchProductFromOrg = async (orgId, productName, token) => {
   console.log(`Fetching product ${productName} from organization ${orgId}`);
-  
+  console.log(`Using token: ${token ? token.substring(0, 20) + '...' : 'NO TOKEN'}`);
+
+  if (!token || token.trim() === '') {
+    throw new Error('Authentication token is required');
+  }
+
   try {
     const response = await axios({
       method: 'GET',
@@ -30,13 +34,16 @@ const fetchProductFromOrg = async (orgId, productName, token) => {
     return response.data;
   } catch (error) {
     console.error('Error fetching product:', error.message);
+    console.error('Status code:', error.response?.status);
+    console.error('Response data:', error.response?.data);
+
     const statusCode = error.response?.status || 500;
     const errorMessage = error.response?.data?.error?.message || error.message;
-    
+
     const enhancedError = new Error(errorMessage);
     enhancedError.status = statusCode;
     enhancedError.details = error.response?.data;
-    
+
     throw enhancedError;
   }
 };
@@ -56,8 +63,8 @@ const modifyProductForClone = (productData, newData) => {
     name: newData.newProductName,
     displayName: newData.newDisplayName,
     description: newData.description,
-    environments: Array.isArray(newData.environments) 
-      ? newData.environments 
+    environments: Array.isArray(newData.environments)
+      ? newData.environments
       : [newData.environments]
   };
 
@@ -78,7 +85,7 @@ const modifyProductForClone = (productData, newData) => {
  * @param {string} token - Authentication token
  * @returns {Promise<Object>} - Created product data
  */
-const createProductInOrg = async (orgId, productData, token,newProductName) => {
+const createProductInOrg = async (orgId, productData, token, newProductName) => {
   console.log(`Creating product in organization ${orgId}`);
   console.log('Product data to be created:', productData);
 
@@ -99,11 +106,11 @@ const createProductInOrg = async (orgId, productData, token,newProductName) => {
     console.error('Error creating product:', error.message);
     const statusCode = error.response?.status || 500;
     const errorMessage = error.response?.data?.error?.message || error.message;
-    
+
     const enhancedError = new Error(errorMessage);
     enhancedError.status = statusCode;
     enhancedError.details = error.response?.data;
-    
+
     throw enhancedError;
   }
 };
