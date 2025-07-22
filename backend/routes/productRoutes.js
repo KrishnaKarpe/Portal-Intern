@@ -4,9 +4,8 @@ const {
     cloneProduct,
     updateProduct,
     getOrganizations,
-    getProductsByOrganization,
     getAllProductsFromOrganization,
-    getProductDetailsById
+    getProductForView
 } = require('../controllers/productController');
 const { validateCloneProduct, validateUpdateProduct } = require('../middleware/validation');
 
@@ -19,9 +18,6 @@ router.get('/products/organizations', getOrganizations);
 
 // Real API product operations
 router.get('/products/by-organization/:orgId', getAllProductsFromOrganization);
-router.get('/products/details/:orgId/:productName', getProductDetailsById);
-
-// Fallback route for mock data (optional)
-router.get('/products/mock/by-organization/:orgId', getProductsByOrganization);
+router.get('/products/view/:orgId/:productName', getProductForView); // New view endpoint
 
 module.exports = router;

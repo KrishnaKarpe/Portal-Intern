@@ -130,7 +130,7 @@ const updateProduct = async (req, res) => {
 };
 
 /**
- * Get all products from an organization using real Apigee API
+ * Get all products from an organization using real Apigee API (simplified)
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
@@ -151,7 +151,6 @@ const getAllProductsFromOrganization = async (req, res) => {
     console.log('Fetching all products from organization:', orgId);
     const productsData = await fetchAllProductsFromOrg(orgId, token);
 
-    // Transform the Apigee API response to match frontend expectations
     let products = [];
 
     if (productsData.apiProduct && Array.isArray(productsData.apiProduct)) {
@@ -161,20 +160,15 @@ const getAllProductsFromOrganization = async (req, res) => {
         name: product.name,
         displayName: product.displayName || product.name,
         description: product.description || '',
-        status: product.approvalType === 'auto' ? 'Published' : 'Draft',
-        apiCount: product.apiResources ? product.apiResources.length : 0,
         environments: product.environments || [],
-        createdAt: product.createdAt ? new Date(parseInt(product.createdAt)).toLocaleDateString() : '',
-        lastModifiedAt: product.lastModifiedAt ? new Date(parseInt(product.lastModifiedAt)).toLocaleDateString() : '',
-        orgId: orgId,
-        approvalType: product.approvalType
+        orgId: orgId
       }));
     } else if (Array.isArray(productsData)) {
       // If response is directly an array of product names
       console.log('Received product names list, fetching details for each...');
 
-      // Fetch details for each product (limit to first 20 to avoid rate limiting)
-      const productNames = productsData.slice(0, 20);
+      // Limit to first 15 products to avoid rate limiting
+      const productNames = productsData.slice(0, 15);
 
       products = await Promise.all(
         productNames.map(async (productName, index) => {
@@ -185,13 +179,8 @@ const getAllProductsFromOrganization = async (req, res) => {
               name: productDetails.name,
               displayName: productDetails.displayName || productDetails.name,
               description: productDetails.description || '',
-              status: productDetails.approvalType === 'auto' ? 'Published' : 'Draft',
-              apiCount: productDetails.apiResources ? productDetails.apiResources.length : 0,
               environments: productDetails.environments || [],
-              createdAt: productDetails.createdAt ? new Date(parseInt(productDetails.createdAt)).toLocaleDateString() : '',
-              lastModifiedAt: productDetails.lastModifiedAt ? new Date(parseInt(productDetails.lastModifiedAt)).toLocaleDateString() : '',
-              orgId: orgId,
-              approvalType: productDetails.approvalType
+              orgId: orgId
             };
           } catch (error) {
             console.error(`Error fetching details for product ${productName}:`, error);
@@ -201,11 +190,8 @@ const getAllProductsFromOrganization = async (req, res) => {
               name: productName,
               displayName: productName,
               description: 'Unable to fetch details',
-              status: 'Unknown',
-              apiCount: 0,
               environments: [],
-              orgId: orgId,
-              approvalType: 'unknown'
+              orgId: orgId
             };
           }
         })
@@ -237,11 +223,11 @@ const getAllProductsFromOrganization = async (req, res) => {
 };
 
 /**
- * Get detailed information about a specific product
+ * Get detailed product information for viewing with specific data extraction
  * @param {Object} req - Express request object  
  * @param {Object} res - Express response object
  */
-const getProductDetailsById = async (req, res) => {
+const getProductForView = async (req, res) => {
   try {
     const { orgId, productName } = req.params;
     const { token } = req.query;
@@ -253,16 +239,56 @@ const getProductDetailsById = async (req, res) => {
       });
     }
 
-    console.log('Fetching product details:', { orgId, productName });
+    console.log('Fetching product for view:', { orgId, productName });
     const productDetails = await fetchProductFromOrg(orgId, productName, token);
+
+    // Extract specific data as per your requirements
+    const transformedProduct = {
+      name: productDetails.name,
+      displayName: productDetails.displayName || productDetails.name,
+      description: productDetails.description || '',
+      environments: productDetails.environments || [],
+
+      // Extract operation group data
+      apiSources: [],
+      resources: [],
+      methods: []
+    };
+
+    // Process operation group if it exists
+    if (productDetails.operationGroup && productDetails.operationGroup.operationConfigs) {
+      productDetails.operationGroup.operationConfigs.forEach(config => {
+        if (config.apiSource) {
+          transformedProduct.apiSources.push(config.apiSource);
+        }
+
+        if (config.operations) {
+          config.operations.forEach(operation => {
+            if (operation.resource) {
+              transformedProduct.resources.push(operation.resource);
+            }
+            if (operation.methods) {
+              transformedProduct.methods.push(...operation.methods);
+            }
+          });
+        }
+      });
+    }
+
+    // Remove duplicates
+    transformedProduct.apiSources = [...new Set(transformedProduct.apiSources)];
+    transformedProduct.resources = [...new Set(transformedProduct.resources)];
+    transformedProduct.methods = [...new Set(transformedProduct.methods)];
+
+    console.log('Transformed product for view:', transformedProduct);
 
     return res.status(200).json({
       success: true,
-      data: productDetails
+      data: transformedProduct
     });
 
   } catch (error) {
-    console.error('Error fetching product details:', error);
+    console.error('Error fetching product for view:', error);
 
     return res.status(error.status || 500).json({
       success: false,
@@ -328,5 +354,6 @@ module.exports = {
   getOrganizations,
   getProductsByOrganization,
   getAllProductsFromOrganization,
-  getProductDetailsById
+  getProductDetailsById: getProductForView, // Use the new function for view
+  getProductForView
 };

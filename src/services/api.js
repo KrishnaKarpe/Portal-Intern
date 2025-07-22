@@ -128,6 +128,29 @@ export const getProductDetails = async (orgId, productName, token) => {
 };
 
 /**
+ * Get detailed product information for viewing
+ * @param {string} orgId - Organization ID
+ * @param {string} productName - Product name
+ * @param {string} token - Authentication token
+ * @returns {Promise<Object>} Product details
+ */
+export const getProductForView = async (orgId, productName, token) => {
+  try {
+    const response = await fetch(`${API_URL}/products/view/${orgId}/${productName}?token=${encodeURIComponent(token)}`);
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to fetch product details');
+    }
+
+    return data.data;
+  } catch (error) {
+    console.error('Error fetching product for view:', error);
+    throw error;
+  }
+};
+
+/**
  * Get products by organization ID (fallback using mock data)
  * @param {string|number} orgId - Organization ID
  * @returns {Promise<Array>} List of products

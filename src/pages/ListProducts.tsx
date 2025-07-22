@@ -4,11 +4,12 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
-import { Search, RefreshCw, Eye, AlertCircle, Package } from 'lucide-react';
-import { getAllProductsFromOrganization } from '@/services/api';
+import { Search, RefreshCw, Eye, AlertCircle, Package, X, Code, Globe, Settings } from 'lucide-react';
+import { getAllProductsFromOrganization, getProductForView } from '@/services/api';
 
 const organizations = [
   { id: 1, name: 'apigee-prod-ouax' },
@@ -21,7 +22,9 @@ const ListProducts = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [products, setProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState("all");
+  const [viewingProduct, setViewingProduct] = useState(null);
+  const [isViewLoading, setIsViewLoading] = useState(false);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
 
   const handleSearch = async () => {
     if (!selectedOrg) {
@@ -74,16 +77,36 @@ const ListProducts = () => {
     }
   };
 
-  const getFilteredProducts = (status = 'all') => {
-    if (status === 'all') return products;
-    if (status === 'published') return products.filter(p => p.status === 'Published');
-    if (status === 'draft') return products.filter(p => p.status === 'Draft');
-    return products;
-  };
+  const handleViewProduct = async (product) => {
+    if (!token || !selectedOrg) {
+      toast.error('Token and organization are required');
+      return;
+    }
 
-  const viewProduct = (product) => {
-    toast.info(`Viewing product: ${product.name}`);
-    console.log('Product details:', product);
+    setIsViewLoading(true);
+    setIsViewDialogOpen(true);
+
+    try {
+      // Get the organization name
+      const orgName = organizations.find(org => org.id.toString() === selectedOrg)?.name || selectedOrg;
+      
+      console.log('Fetching detailed view for:', {
+        orgId: orgName,
+        productName: product.name,
+        token: token.substring(0, 20) + '...'
+      });
+
+      const productDetails = await getProductForView(orgName, product.name, token);
+      setViewingProduct(productDetails);
+      
+      toast.success(`Loaded details for ${product.name}`);
+    } catch (error) {
+      console.error('Error fetching product details:', error);
+      toast.error(error.message || 'Failed to fetch product details');
+      setIsViewDialogOpen(false);
+    } finally {
+      setIsViewLoading(false);
+    }
   };
 
   const getOrgName = (orgId) => {
@@ -99,17 +122,14 @@ const ListProducts = () => {
             <TableHead>Name</TableHead>
             <TableHead>Display Name</TableHead>
             <TableHead>Description</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>API Count</TableHead>
             <TableHead>Environments</TableHead>
-            <TableHead>Created</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {productsToShow.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+              <TableCell colSpan={5} className="text-center py-8 text-gray-500">
                 No products found
               </TableCell>
             </TableRow>
@@ -121,50 +141,40 @@ const ListProducts = () => {
               >
                 <TableCell className="font-medium">{product.name}</TableCell>
                 <TableCell>{product.displayName}</TableCell>
-                <TableCell className="max-w-xs truncate">
-                  {product.description || 'No description'}
+                <TableCell className="max-w-xs">
+                  <div className="truncate" title={product.description}>
+                    {product.description || 'No description'}
+                  </div>
                 </TableCell>
-                <TableCell>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    product.status === 'Published' 
-                      ? 'bg-green-100 text-green-800' 
-                      : product.status === 'Draft'
-                      ? 'bg-amber-100 text-amber-800'
-                      : 'bg-gray-100 text-gray-800'
-                  }`}>
-                    {product.status}
-                  </span>
-                </TableCell>
-                <TableCell>{product.apiCount}</TableCell>
                 <TableCell>
                   <div className="flex flex-wrap gap-1">
                     {product.environments && product.environments.length > 0 ? (
-                      product.environments.slice(0, 2).map((env, index) => (
-                        <span 
-                          key={index}
-                          className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded"
-                        >
-                          {env}
-                        </span>
-                      ))
+                      <>
+                        {product.environments.slice(0, 3).map((env, index) => (
+                          <Badge 
+                            key={index}
+                            variant="secondary"
+                            className="px-2 py-1 bg-blue-100 text-blue-800 text-xs"
+                          >
+                            {env}
+                          </Badge>
+                        ))}
+                        {product.environments.length > 3 && (
+                          <span className="text-xs text-gray-500">
+                            +{product.environments.length - 3} more
+                          </span>
+                        )}
+                      </>
                     ) : (
                       <span className="text-gray-500 text-xs">No environments</span>
                     )}
-                    {product.environments && product.environments.length > 2 && (
-                      <span className="text-xs text-gray-500">
-                        +{product.environments.length - 2} more
-                      </span>
-                    )}
                   </div>
-                </TableCell>
-                <TableCell className="text-sm text-gray-500">
-                  {product.createdAt || 'N/A'}
                 </TableCell>
                 <TableCell className="text-right">
                   <Button 
                     variant="outline" 
                     size="sm"
-                    onClick={() => viewProduct(product)}
+                    onClick={() => handleViewProduct(product)}
                     className="hover:bg-blue-600 hover:text-white transition-colors"
                   >
                     <Eye className="h-4 w-4 mr-1" />
@@ -285,40 +295,178 @@ const ListProducts = () => {
                 Found {products.length} products in {getOrgName(selectedOrg)}
               </div>
               
-              <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="mb-4">
-                  <TabsTrigger value="all">
-                    All Products ({products.length})
-                  </TabsTrigger>
-                  <TabsTrigger value="published">
-                    Published ({getFilteredProducts('published').length})
-                  </TabsTrigger>
-                  <TabsTrigger value="draft">
-                    Draft ({getFilteredProducts('draft').length})
-                  </TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="all" className="mt-0">
-                  {renderProductTable(getFilteredProducts('all'))}
-                </TabsContent>
-                
-                <TabsContent value="published" className="mt-0">
-                  {renderProductTable(getFilteredProducts('published'))}
-                </TabsContent>
-                
-                <TabsContent value="draft" className="mt-0">
-                  {renderProductTable(getFilteredProducts('draft'))}
-                </TabsContent>
-              </Tabs>
+              {renderProductTable(products)}
             </div>
           )}
         </CardContent>
       </Card>
 
+      {/* Product View Dialog */}
+      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Package className="h-5 w-5 text-blue-600" />
+                Product Details
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsViewDialogOpen(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </DialogTitle>
+            <DialogDescription>
+              Detailed information about the selected API product
+            </DialogDescription>
+          </DialogHeader>
+          
+          {isViewLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <RefreshCw className="h-8 w-8 animate-spin text-blue-600" />
+              <span className="ml-3 text-gray-600">Loading product details...</span>
+            </div>
+          ) : viewingProduct ? (
+            <div className="space-y-6">
+              {/* Basic Information */}
+              <div className="grid gap-6 md:grid-cols-2">
+                <div>
+                  <label className="text-sm font-medium text-gray-700 flex items-center gap-1">
+                    <Package className="h-4 w-4" />
+                    Product Name
+                  </label>
+                  <p className="mt-1 text-lg font-semibold text-gray-900">{viewingProduct.name}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 flex items-center gap-1">
+                    <Settings className="h-4 w-4" />
+                    Display Name
+                  </label>
+                  <p className="mt-1 text-lg font-semibold text-gray-900">{viewingProduct.displayName}</p>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-700">Description</label>
+                <p className="mt-1 text-gray-900 bg-gray-50 p-3 rounded-lg">
+                  {viewingProduct.description || 'No description available'}
+                </p>
+              </div>
+
+              {/* Environments */}
+              <div>
+                <label className="text-sm font-medium text-gray-700 flex items-center gap-1 mb-3">
+                  <Globe className="h-4 w-4" />
+                  Environments ({viewingProduct.environments?.length || 0})
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {viewingProduct.environments && viewingProduct.environments.length > 0 ? (
+                    viewingProduct.environments.map((env, index) => (
+                      <Badge 
+                        key={index}
+                        className="px-3 py-1 bg-green-100 text-green-800 text-sm"
+                      >
+                        <Globe className="h-3 w-3 mr-1" />
+                        {env}
+                      </Badge>
+                    ))
+                  ) : (
+                    <span className="text-gray-500 text-sm bg-gray-100 px-3 py-1 rounded">
+                      No environments configured
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* API Sources */}
+              {viewingProduct.apiSources && viewingProduct.apiSources.length > 0 && (
+                <div>
+                  <label className="text-sm font-medium text-gray-700 flex items-center gap-1 mb-3">
+                    <Code className="h-4 w-4" />
+                    API Sources ({viewingProduct.apiSources.length})
+                  </label>
+                  <div className="space-y-2">
+                    {viewingProduct.apiSources.map((source, index) => (
+                      <div key={index} className="flex items-center gap-2 bg-blue-50 p-2 rounded">
+                        <Code className="h-4 w-4 text-blue-600" />
+                        <span className="font-mono text-sm">{source}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Resources */}
+              {viewingProduct.resources && viewingProduct.resources.length > 0 && (
+                <div>
+                  <label className="text-sm font-medium text-gray-700 flex items-center gap-1 mb-3">
+                    <Settings className="h-4 w-4" />
+                    Resources ({viewingProduct.resources.length})
+                  </label>
+                  <div className="space-y-1">
+                    {viewingProduct.resources.map((resource, index) => (
+                      <div key={index} className="bg-gray-50 p-2 rounded font-mono text-sm">
+                        {resource}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* HTTP Methods */}
+              {viewingProduct.methods && viewingProduct.methods.length > 0 && (
+                <div>
+                  <label className="text-sm font-medium text-gray-700 flex items-center gap-1 mb-3">
+                    <Globe className="h-4 w-4" />
+                    HTTP Methods ({viewingProduct.methods.length})
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {viewingProduct.methods.map((method, index) => {
+                      const methodColors = {
+                        'GET': 'bg-green-100 text-green-800',
+                        'POST': 'bg-blue-100 text-blue-800',
+                        'PUT': 'bg-orange-100 text-orange-800',
+                        'DELETE': 'bg-red-100 text-red-800',
+                        'PATCH': 'bg-purple-100 text-purple-800'
+                      };
+                      
+                      return (
+                        <Badge 
+                          key={index}
+                          className={`px-3 py-1 text-sm font-semibold ${methodColors[method] || 'bg-gray-100 text-gray-800'}`}
+                        >
+                          {method}
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* No Data Message */}
+              {(!viewingProduct.apiSources || viewingProduct.apiSources.length === 0) && 
+               (!viewingProduct.resources || viewingProduct.resources.length === 0) && 
+               (!viewingProduct.methods || viewingProduct.methods.length === 0) && (
+                <div className="text-center py-6 bg-gray-50 rounded-lg">
+                  <Package className="h-12 w-12 mx-auto text-gray-400 mb-2" />
+                  <p className="text-gray-600">No operation configuration data available</p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <Package className="h-12 w-12 mx-auto text-gray-400 mb-2" />
+              <p>No product details available</p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Quick Info Cards */}
       <div className="grid gap-4 md:grid-cols-3">
-        {
-          [
+        {[
             {
               icon: Package,
               title: "Real-time Data",
@@ -340,8 +488,7 @@ const ListProducts = () => {
               <h3 className="font-semibold text-gray-900">{feature.title}</h3>
               <p className="text-sm text-gray-600">{feature.description}</p>
             </Card>
-          ))
-        }
+          ))}
       </div>
     </motion.div>
   );
