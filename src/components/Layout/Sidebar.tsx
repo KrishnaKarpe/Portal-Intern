@@ -11,11 +11,11 @@ const menuItems = [
     path: '/clone-product',
     icon: <Layers className="h-5 w-5 mr-3" />,
   },
-  {
-    name: 'Create Product',
-    path: '/update-product',
-    icon: <RefreshCw className="h-5 w-5 mr-3" />,
-  },
+  // {
+  //   name: 'Create Product',
+  //   path: '/update-product',
+  //   icon: <RefreshCw className="h-5 w-5 mr-3" />,
+  // },
   {
     name: 'Update Product',
     path: '/update-product',

@@ -14,4 +14,5 @@ router.put('/products/update', validateUpdateProduct, updateProduct);
 router.get('/products/organizations', getOrganizations);
 router.get('/products/by-organization/:orgId', getProductsByOrganization);
 
+
 module.exports = router;

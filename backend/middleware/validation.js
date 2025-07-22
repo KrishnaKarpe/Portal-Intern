@@ -16,7 +16,7 @@ const validateCloneProduct = [
   body('targetToken').notEmpty().withMessage('Target token is required'),
   body('productName').notEmpty().withMessage('Product name is required'),
   body('newProductName').notEmpty().withMessage('New product name is required'),
-  
+
   // Check validation results
   (req, res, next) => {
     const errors = validationResult(req);
@@ -38,7 +38,7 @@ const validateUpdateProduct = [
   body('organizationId').notEmpty().withMessage('Organization ID is required'),
   body('productId').notEmpty().withMessage('Product ID is required'),
   body('token').notEmpty().withMessage('Authorization token is required'),
-  
+
   // Check that at least one update field is provided
   body().custom(body => {
     if (!(body.name || body.displayName || body.description)) {
@@ -46,7 +46,7 @@ const validateUpdateProduct = [
     }
     return true;
   }),
-  
+
   // Check validation results
   (req, res, next) => {
     const errors = validationResult(req);

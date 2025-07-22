@@ -132,11 +132,11 @@ const CloneProduct = () => {
         {/* Header */}
         <div className="text-center space-y-3">
           <div className="flex items-center justify-center gap-3">
-            <div className="p-3 bg-blue-600 rounded-lg text-white">
-              <Copy size={24} />
+            <div className="">
+              {/* <Copy size={24} /> */}
             </div>
             <h1 className="text-3xl font-bold text-gray-900">
-              Clone Product Across Organizations
+              Clone Product Across Org
             </h1>
           </div>
           <p className="text-gray-600 max-w-2xl mx-auto">
@@ -265,12 +265,12 @@ const CloneProduct = () => {
                   </div>
                 </div>
 
-                <div className="flex items-start gap-2 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                {/* <div className="flex items-start gap-2 p-3 bg-amber-50 rounded-lg border border-amber-200">
                   <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
                   <div className="text-sm text-amber-800">
                     <strong>Security Note:</strong> Tokens are used for authentication only and are not stored.
                   </div>
-                </div>
+                </div> */}
               </div>
 
               {/* Product Details Section */}

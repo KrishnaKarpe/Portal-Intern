@@ -30,12 +30,12 @@ const cloneProduct = async (req, res) => {
       environments
     } = req.body;
 
-    console.log('Attempting to clone product:', {
-      sourceOrg,
-      targetOrg,
-      productName,
-      newProductName
-    });
+    // console.log('Attempting to clone product:', {
+    //   sourceOrg,
+    //   targetOrg,
+    //   productName,
+    //   newProductName
+    // });
 
     // Step 1: Fetch product from source organization
     console.log('Step 1: Fetching product from source...');
@@ -63,7 +63,7 @@ const cloneProduct = async (req, res) => {
     // console.log("Modified product data:", JSON.stringify(modifiedProduct, null, 2));
 
     // Step 3: Create product in target organization
-    console.log('Step 3: Creating product in target organization...');
+    // console.log('Step 3: Creating product in target organization...');
     const createdProduct = await createProductInOrg(
       targetOrg,
       modifiedProduct,
