@@ -130,7 +130,7 @@ const updateProduct = async (req, res) => {
 };
 
 /**
- * Get all products from an organization using real Apigee API (simplified)
+ * Get all products from an organization using real Apigee API with expand=true
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
@@ -153,9 +153,9 @@ const getAllProductsFromOrganization = async (req, res) => {
 
     let products = [];
 
+    // With expand=true, we should always get detailed product data
     if (productsData.apiProduct && Array.isArray(productsData.apiProduct)) {
-      // If response contains apiProduct array (detailed response)
-      console.log('Processing detailed product response...');
+      console.log('Processing expanded product response...');
       products = productsData.apiProduct.map((product, index) => ({
         id: index + 1,
         name: product.name,
@@ -164,78 +164,30 @@ const getAllProductsFromOrganization = async (req, res) => {
         environments: product.environments || [],
         orgId: orgId
       }));
+
+      // Log statistics about the data quality
+      const productsWithDescription = products.filter(p => p.description && p.description !== '');
+      const productsWithEnvironments = products.filter(p => p.environments && p.environments.length > 0);
+
+      console.log(`Data quality stats:`, {
+        total: products.length,
+        withDescription: productsWithDescription.length,
+        withEnvironments: productsWithEnvironments.length,
+        descriptionPercentage: Math.round((productsWithDescription.length / products.length) * 100),
+        environmentsPercentage: Math.round((productsWithEnvironments.length / products.length) * 100)
+      });
+
     } else if (Array.isArray(productsData)) {
-      // If response is directly an array of product names
-      console.log('Received product names list, fetching details for each...');
-      console.log('Product names received:', productsData.slice(0, 5)); // Log first 5 names
-
-      // Limit to first 10 products to avoid rate limiting and improve performance
-      const productNames = productsData.slice(0, 10);
-
-      // Use Promise.allSettled to handle partial failures
-      const productDetailsPromises = productNames.map(async (productName, index) => {
-        try {
-          console.log(`Fetching details for product: ${productName}`);
-          const productDetails = await fetchProductFromOrg(orgId, productName, token);
-
-          console.log(`Successfully fetched details for ${productName}:`, {
-            name: productDetails.name,
-            displayName: productDetails.displayName,
-            description: productDetails.description?.substring(0, 50) + '...',
-            environments: productDetails.environments
-          });
-
-          return {
-            status: 'fulfilled',
-            value: {
-              id: index + 1,
-              name: productDetails.name,
-              displayName: productDetails.displayName || productDetails.name,
-              description: productDetails.description || '',
-              environments: productDetails.environments || [],
-              orgId: orgId
-            }
-          };
-        } catch (error) {
-          console.error(`Error fetching details for product ${productName}:`, error.message);
-          return {
-            status: 'rejected',
-            reason: error,
-            value: {
-              id: index + 1,
-              name: productName,
-              displayName: productName,
-              description: 'Unable to fetch details - API error',
-              environments: [],
-              orgId: orgId
-            }
-          };
-        }
-      });
-
-      const results = await Promise.allSettled(productDetailsPromises);
-
-      products = results.map((result, index) => {
-        if (result.status === 'fulfilled' && result.value.status === 'fulfilled') {
-          return result.value.value;
-        } else {
-          // Handle rejected promises
-          const productName = productNames[index];
-          console.warn(`Using fallback data for product: ${productName}`);
-          return {
-            id: index + 1,
-            name: productName,
-            displayName: productName,
-            description: 'Details unavailable - check API permissions',
-            environments: [],
-            orgId: orgId
-          };
-        }
-      });
-
-      const successCount = results.filter(r => r.status === 'fulfilled' && r.value.status === 'fulfilled').length;
-      console.log(`Successfully fetched details for ${successCount}/${productNames.length} products`);
-
+      // Fallback: if we get just names (shouldn't happen with expand=true)
+      console.warn('Received product names instead of expanded data - this is unexpected with expand=true');
+      products = productsData.map((productName, index) => ({
+        id: index + 1,
+        name: productName,
+        displayName: productName,
+        description: 'Expanded data not available',
+        environments: [],
+        orgId: orgId
+      }));
     } else {
       console.log('Unexpected API response format:', productsData);
       products = [];
@@ -248,7 +200,7 @@ const getAllProductsFromOrganization = async (req, res) => {
       console.log('Sample product data being sent:', {
         name: products[0].name,
         displayName: products[0].displayName,
-        description: products[0].description?.substring(0, 50) + '...',
+        description: products[0].description?.substring(0, 50) + (products[0].description?.length > 50 ? '...' : ''),
         environments: products[0].environments,
         hasDescription: !!products[0].description,
         hasEnvironments: products[0].environments.length > 0
@@ -260,7 +212,7 @@ const getAllProductsFromOrganization = async (req, res) => {
       data: products,
       total: products.length,
       organization: orgId,
-      message: `Found ${products.length} products`  // Add helpful message
+      message: `Found ${products.length} products with expanded details`
     });
 
   } catch (error) {
@@ -295,7 +247,7 @@ const getProductForView = async (req, res) => {
     console.log('Fetching product for view:', { orgId, productName });
     const productDetails = await fetchProductFromOrg(orgId, productName, token);
 
-    // Extract specific data as per your requirements with grouped structure
+    // Extract specific data as per requirements with grouped structure
     const transformedProduct = {
       name: productDetails.name,
       displayName: productDetails.displayName || productDetails.name,
@@ -325,7 +277,15 @@ const getProductForView = async (req, res) => {
       });
     }
 
-    console.log('Transformed product for view with grouped operations:', transformedProduct);
+    // Log what we're sending for debugging
+    console.log('Transformed product for view:', {
+      name: transformedProduct.name,
+      displayName: transformedProduct.displayName,
+      description: transformedProduct.description,
+      environments: transformedProduct.environments,
+      environmentsCount: transformedProduct.environments.length,
+      apiOperationsCount: transformedProduct.apiOperations.length
+    });
 
     return res.status(200).json({
       success: true,

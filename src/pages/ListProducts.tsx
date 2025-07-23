@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -20,15 +20,25 @@ const ListProducts = () => {
   const [selectedOrg, setSelectedOrg] = useState("");
   const [token, setToken] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [products, setProducts] = useState([]);
+  const [allProducts, setAllProducts] = useState([]); // Store all fetched products
   const [isLoading, setIsLoading] = useState(false);
   const [viewingProduct, setViewingProduct] = useState(null);
   const [isViewLoading, setIsViewLoading] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [expandedApiSources, setExpandedApiSources] = useState(new Set());
 
-  // Add this debug function to see what we're receiving
-  const handleSearch = async () => {
+  // Real-time filtered products based on search term
+  const filteredProducts = useMemo(() => {
+    if (!searchTerm.trim()) return allProducts;
+    
+    return allProducts.filter(product => 
+      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.displayName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (product.description && product.description.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+  }, [allProducts, searchTerm]);
+
+  const handleFetchProducts = async () => {
     if (!selectedOrg) {
       toast.error('Please select an organization');
       return;
@@ -42,7 +52,7 @@ const ListProducts = () => {
     setIsLoading(true);
     
     try {
-      console.log('Fetching products for:', {
+      console.log('Fetching products with expanded details for:', {
         orgId: selectedOrg,
         token: token.substring(0, 20) + '...'
       });
@@ -51,46 +61,40 @@ const ListProducts = () => {
       const fetchedProducts = await getAllProductsFromOrganization(orgName, token);
 
       // Debug: Log what we received
-      console.log('Raw fetched products:', fetchedProducts);
-      console.log('Sample product:', fetchedProducts[0]);
-
-      // Apply search filter if search term is provided
-      const filteredProducts = searchTerm 
-        ? fetchedProducts.filter(product => 
-            product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            product.displayName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (product.description && product.description.toLowerCase().includes(searchTerm.toLowerCase()))
-          )
-        : fetchedProducts;
-
-      // Debug: Check if products have descriptions and environments
-      const productsWithDescription = filteredProducts.filter(p => p.description && p.description !== '');
-      const productsWithEnvironments = filteredProducts.filter(p => p.environments && p.environments.length > 0);
+      console.log('Raw fetched products with expand=true:', fetchedProducts);
       
-      console.log(`Products with descriptions: ${productsWithDescription.length}/${filteredProducts.length}`);
-      console.log(`Products with environments: ${productsWithEnvironments.length}/${filteredProducts.length}`);
-
-      if (filteredProducts.length > 0) {
-        console.log('First product sample:', {
-          name: filteredProducts[0].name,
-          description: filteredProducts[0].description,
-          environments: filteredProducts[0].environments
+      if (fetchedProducts.length > 0) {
+        console.log('Sample product with expanded data:', fetchedProducts[0]);
+        
+        // Debug: Check data quality
+        const productsWithDescription = fetchedProducts.filter(p => p.description && p.description !== '');
+        const productsWithEnvironments = fetchedProducts.filter(p => p.environments && p.environments.length > 0);
+        
+        console.log(`Data quality:`, {
+          total: fetchedProducts.length,
+          withDescription: productsWithDescription.length,
+          withEnvironments: productsWithEnvironments.length,
+          descriptionRate: `${Math.round((productsWithDescription.length / fetchedProducts.length) * 100)}%`,
+          environmentsRate: `${Math.round((productsWithEnvironments.length / fetchedProducts.length) * 100)}%`
         });
+        
+        // Show enhanced success message
+        toast.success(
+          `Found ${fetchedProducts.length} products with full details!\n` +
+          `${productsWithDescription.length} have descriptions, ${productsWithEnvironments.length} have environments`,
+          { duration: 4000 }
+        );
       }
 
-      setProducts(filteredProducts);
+      setAllProducts(fetchedProducts);
       
-      if (filteredProducts.length === 0 && searchTerm) {
-        toast.info('No products match your search criteria');
-      } else if (filteredProducts.length === 0) {
+      if (fetchedProducts.length === 0) {
         toast.info('No products found for the selected organization');
-      } else {
-        toast.success(`Found ${filteredProducts.length} products (${productsWithDescription.length} with descriptions, ${productsWithEnvironments.length} with environments)`);
       }
     } catch (error) {
       console.error('Error fetching products:', error);
       toast.error(error.message || 'Failed to fetch products');
-      setProducts([]);
+      setAllProducts([]);
     } finally {
       setIsLoading(false);
     }
@@ -115,6 +119,11 @@ const ListProducts = () => {
       });
 
       const productDetails = await getProductForView(orgName, product.name, token);
+      
+      // Debug: Log what we received for the view
+      console.log('Product details for view:', productDetails);
+      console.log('Environments in view data:', productDetails.environments);
+      
       setViewingProduct(productDetails);
       
       // Reset expanded state when new product is loaded
@@ -152,8 +161,8 @@ const ListProducts = () => {
           <TableRow>
             <TableHead>Name</TableHead>
             <TableHead>Display Name</TableHead>
-            {/* <TableHead>Description</TableHead>
-            <TableHead>Environments</TableHead> */}
+            <TableHead>Description</TableHead>
+            <TableHead>Environments</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
@@ -161,7 +170,7 @@ const ListProducts = () => {
           {productsToShow.length === 0 ? (
             <TableRow>
               <TableCell colSpan={5} className="text-center py-8 text-gray-500">
-                No products found
+                {searchTerm ? `No products match "${searchTerm}"` : 'No products found'}
               </TableCell>
             </TableRow>
           ) : (
@@ -172,12 +181,12 @@ const ListProducts = () => {
               >
                 <TableCell className="font-medium">{product.name}</TableCell>
                 <TableCell>{product.displayName}</TableCell>
-                {/* <TableCell className="max-w-xs">
+                <TableCell className="max-w-xs">
                   <div className="truncate" title={product.description}>
                     {product.description || 'No description'}
                   </div>
-                </TableCell> */}
-                {/* <TableCell>
+                </TableCell>
+                <TableCell>
                   <div className="flex flex-wrap gap-1">
                     {product.environments && product.environments.length > 0 ? (
                       <>
@@ -200,7 +209,7 @@ const ListProducts = () => {
                       <span className="text-gray-500 text-xs">No environments</span>
                     )}
                   </div>
-                </TableCell> */}
+                </TableCell>
                 <TableCell className="text-right">
                   <Button 
                     variant="outline" 
@@ -278,18 +287,24 @@ const ListProducts = () => {
             
             <div className="space-y-2">
               <label htmlFor="search" className="text-sm font-medium">
-                Search Term
+                Search Products (Real-time)
               </label>
               <div className="relative">
                 <Input
                   id="search"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search by name, display name, or description"
+                  placeholder="Type to search products..."
                   className="pr-10 transition-all duration-200 focus:ring-2 focus:ring-primary/20"
+                  disabled={allProducts.length === 0}
                 />
                 <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               </div>
+              {searchTerm && (
+                <p className="text-xs text-gray-500">
+                  Showing {filteredProducts.length} of {allProducts.length} products
+                </p>
+              )}
             </div>
           </div>
 
@@ -302,7 +317,7 @@ const ListProducts = () => {
           
           <div className="mt-6">
             <Button 
-              onClick={handleSearch}
+              onClick={handleFetchProducts}
               disabled={isLoading || !selectedOrg || !token}
               className="bg-blue-600 hover:bg-blue-700 transition-colors duration-300"
             >
@@ -313,20 +328,33 @@ const ListProducts = () => {
                 </>
               ) : (
                 <>
-                  <Search className="mr-2 h-4 w-4" />
-                  Search Products
+                  <Package className="mr-2 h-4 w-4" />
+                  Fetch Products
                 </>
               )}
             </Button>
           </div>
           
-          {products.length > 0 && (
+          {allProducts.length > 0 && (
             <div className="mt-6">
-              <div className="mb-4 text-sm text-gray-600">
-                Found {products.length} products in {getOrgName(selectedOrg)}
+              <div className="mb-4 text-sm text-gray-600 flex items-center justify-between">
+                <span>
+                  Found {allProducts.length} products in {getOrgName(selectedOrg)}
+                  {searchTerm && ` (${filteredProducts.length} matching "${searchTerm}")`}
+                </span>
+                {searchTerm && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSearchTerm("")}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    Clear search
+                  </Button>
+                )}
               </div>
               
-              {renderProductTable(products)}
+              {renderProductTable(filteredProducts)}
             </div>
           )}
         </CardContent>
@@ -379,15 +407,16 @@ const ListProducts = () => {
                 </div>
               </div>
 
-              {/* <div>
+              {/* Description */}
+              <div>
                 <label className="text-sm font-medium text-gray-700">Description</label>
                 <p className="mt-1 text-gray-900 bg-gray-50 p-3 rounded-lg">
                   {viewingProduct.description || 'No description available'}
                 </p>
-              </div> */}
+              </div>
 
-              {/* Environments */}
-              {/* <div>
+              {/* Environments - UNCOMMENTED AND FIXED */}
+              <div>
                 <label className="text-sm font-medium text-gray-700 flex items-center gap-1 mb-3">
                   <Globe className="h-4 w-4" />
                   Environments ({viewingProduct.environments?.length || 0})
@@ -409,7 +438,7 @@ const ListProducts = () => {
                     </span>
                   )}
                 </div>
-              </div> */}
+              </div>
 
               {/* API Operations - Grouped by API Source */}
               {viewingProduct.apiOperations && viewingProduct.apiOperations.length > 0 && (
@@ -448,7 +477,7 @@ const ListProducts = () => {
                           <div className="p-4 space-y-3">
                             {apiOp.operations && apiOp.operations.length > 0 ? (
                               apiOp.operations.map((operation, opIndex) => (
-                                <div key={opIndex} className="bg-gray-50 p-3 rounded-md">
+                                <div key={opIndex} className="bg-gray-50 p-3 rounded border">
                                   <div className="flex items-start justify-between gap-4">
                                     {/* Resource */}
                                     <div className="flex-1">
@@ -529,27 +558,27 @@ const ListProducts = () => {
       {/* Quick Info Cards */}
       <div className="grid gap-4 md:grid-cols-3">
         {[
-            {
-              icon: Package,
-              title: "Real-time Data",
-              description: "Fetch live product data from Apigee"
-            },
-            {
-              icon: Search,
-              title: "Advanced Search",
-              description: "Filter products by multiple criteria"
-            },
-            {
-              icon: Eye,
-              title: "Detailed View",
-              description: "View comprehensive product information"
-            }
-          ].map((feature, index) => (
-            <Card key={feature.title} className="text-center p-4 hover:shadow-md transition-shadow">
-              <feature.icon className="h-8 w-8 mx-auto mb-2 text-blue-600" />
-              <h3 className="font-semibold text-gray-900">{feature.title}</h3>
-              <p className="text-sm text-gray-600">{feature.description}</p>
-            </Card>
+          {
+            icon: Package,
+            title: "Expanded Data",
+            description: "Fetch complete product details in one API call"
+          },
+          {
+            icon: Search,
+            title: "Real-time Search",
+            description: "Filter products as you type"
+          },
+          {
+            icon: Eye,
+            title: "Detailed View",
+            description: "View comprehensive product information"
+          }
+        ].map((feature, index) => (
+          <Card key={feature.title} className="text-center p-4 hover:shadow-md transition-shadow">
+            <feature.icon className="h-8 w-8 mx-auto mb-2 text-blue-600" />
+            <h3 className="font-semibold text-gray-900">{feature.title}</h3>
+            <p className="text-sm text-gray-600">{feature.description}</p>
+          </Card>
         ))}
       </div>
     </motion.div>

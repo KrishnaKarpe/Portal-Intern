@@ -63,13 +63,13 @@ const fetchProductFromOrg = async (orgId, productName, token) => {
 };
 
 /**
- * Fetch all products from an organization using Apigee API
+ * Fetch all products from an organization using Apigee API with expand=true
  * @param {string} orgId - Organization ID
  * @param {string} token - Authentication token
- * @returns {Promise<Array>} - Products data
+ * @returns {Promise<Array>} - Products data with full details
  */
 const fetchAllProductsFromOrg = async (orgId, token) => {
-  console.log(`Fetching all products from organization ${orgId}`);
+  console.log(`Fetching all products from organization ${orgId} with expanded details`);
   console.log(`Using token: ${token ? token.substring(0, 20) + '...' : 'NO TOKEN'}`);
 
   if (!token || token.trim() === '') {
@@ -79,17 +79,38 @@ const fetchAllProductsFromOrg = async (orgId, token) => {
   try {
     const response = await axios({
       method: 'GET',
-      url: `https://apigee.googleapis.com/v1/organizations/${orgId}/apiproducts`,
+      url: `https://apigee.googleapis.com/v1/organizations/${orgId}/apiproducts?expand=true`,
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
-      }
+      },
+      timeout: 15000 // Increase timeout for expanded response
     });
 
-    console.log('Successfully fetched products list:', response.data);
+    console.log('Successfully fetched expanded products list');
+    console.log('Response structure:', {
+      hasApiProduct: !!response.data.apiProduct,
+      isArray: Array.isArray(response.data.apiProduct),
+      count: response.data.apiProduct?.length || 0
+    });
+
+    // Log sample product to verify structure
+    if (response.data.apiProduct && response.data.apiProduct.length > 0) {
+      const sampleProduct = response.data.apiProduct[0];
+      console.log('Sample expanded product:', {
+        name: sampleProduct.name,
+        displayName: sampleProduct.displayName,
+        hasDescription: !!sampleProduct.description,
+        descriptionLength: sampleProduct.description?.length || 0,
+        hasEnvironments: !!sampleProduct.environments,
+        environmentsCount: sampleProduct.environments?.length || 0,
+        environments: sampleProduct.environments
+      });
+    }
+
     return response.data;
   } catch (error) {
-    console.error('Error fetching products:', error.message);
+    console.error('Error fetching expanded products:', error.message);
     console.error('Status code:', error.response?.status);
     console.error('Response data:', error.response?.data);
 
