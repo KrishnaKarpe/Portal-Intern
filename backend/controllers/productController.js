@@ -155,6 +155,7 @@ const getAllProductsFromOrganization = async (req, res) => {
 
     if (productsData.apiProduct && Array.isArray(productsData.apiProduct)) {
       // If response contains apiProduct array (detailed response)
+      console.log('Processing detailed product response...');
       products = productsData.apiProduct.map((product, index) => ({
         id: index + 1,
         name: product.name,
@@ -166,36 +167,75 @@ const getAllProductsFromOrganization = async (req, res) => {
     } else if (Array.isArray(productsData)) {
       // If response is directly an array of product names
       console.log('Received product names list, fetching details for each...');
+      console.log('Product names received:', productsData.slice(0, 5)); // Log first 5 names
 
-      // Limit to first 15 products to avoid rate limiting
-      const productNames = productsData.slice(0, 15);
+      // Limit to first 10 products to avoid rate limiting and improve performance
+      const productNames = productsData.slice(0, 10);
 
-      products = await Promise.all(
-        productNames.map(async (productName, index) => {
-          try {
-            const productDetails = await fetchProductFromOrg(orgId, productName, token);
-            return {
+      // Use Promise.allSettled to handle partial failures
+      const productDetailsPromises = productNames.map(async (productName, index) => {
+        try {
+          console.log(`Fetching details for product: ${productName}`);
+          const productDetails = await fetchProductFromOrg(orgId, productName, token);
+
+          console.log(`Successfully fetched details for ${productName}:`, {
+            name: productDetails.name,
+            displayName: productDetails.displayName,
+            description: productDetails.description?.substring(0, 50) + '...',
+            environments: productDetails.environments
+          });
+
+          return {
+            status: 'fulfilled',
+            value: {
               id: index + 1,
               name: productDetails.name,
               displayName: productDetails.displayName || productDetails.name,
               description: productDetails.description || '',
               environments: productDetails.environments || [],
               orgId: orgId
-            };
-          } catch (error) {
-            console.error(`Error fetching details for product ${productName}:`, error);
-            // Return basic info if detailed fetch fails
-            return {
+            }
+          };
+        } catch (error) {
+          console.error(`Error fetching details for product ${productName}:`, error.message);
+          return {
+            status: 'rejected',
+            reason: error,
+            value: {
               id: index + 1,
               name: productName,
               displayName: productName,
-              description: 'Unable to fetch details',
+              description: 'Unable to fetch details - API error',
               environments: [],
               orgId: orgId
-            };
-          }
-        })
-      );
+            }
+          };
+        }
+      });
+
+      const results = await Promise.allSettled(productDetailsPromises);
+
+      products = results.map((result, index) => {
+        if (result.status === 'fulfilled' && result.value.status === 'fulfilled') {
+          return result.value.value;
+        } else {
+          // Handle rejected promises
+          const productName = productNames[index];
+          console.warn(`Using fallback data for product: ${productName}`);
+          return {
+            id: index + 1,
+            name: productName,
+            displayName: productName,
+            description: 'Details unavailable - check API permissions',
+            environments: [],
+            orgId: orgId
+          };
+        }
+      });
+
+      const successCount = results.filter(r => r.status === 'fulfilled' && r.value.status === 'fulfilled').length;
+      console.log(`Successfully fetched details for ${successCount}/${productNames.length} products`);
+
     } else {
       console.log('Unexpected API response format:', productsData);
       products = [];
@@ -203,11 +243,24 @@ const getAllProductsFromOrganization = async (req, res) => {
 
     console.log(`Transformed ${products.length} products for frontend`);
 
+    // Log sample of what we're sending to frontend
+    if (products.length > 0) {
+      console.log('Sample product data being sent:', {
+        name: products[0].name,
+        displayName: products[0].displayName,
+        description: products[0].description?.substring(0, 50) + '...',
+        environments: products[0].environments,
+        hasDescription: !!products[0].description,
+        hasEnvironments: products[0].environments.length > 0
+      });
+    }
+
     return res.status(200).json({
       success: true,
       data: products,
       total: products.length,
-      organization: orgId
+      organization: orgId,
+      message: `Found ${products.length} products`  // Add helpful message
     });
 
   } catch (error) {

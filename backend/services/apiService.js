@@ -14,7 +14,6 @@ const axios = require('axios');
  */
 const fetchProductFromOrg = async (orgId, productName, token) => {
   console.log(`Fetching product ${productName} from organization ${orgId}`);
-  console.log(`Using token: ${token ? token.substring(0, 20) + '...' : 'NO TOKEN'}`);
 
   if (!token || token.trim() === '') {
     throw new Error('Authentication token is required');
@@ -27,15 +26,30 @@ const fetchProductFromOrg = async (orgId, productName, token) => {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
-      }
+      },
+      timeout: 10000 // Add timeout to prevent hanging requests
     });
 
-    console.log('Successfully fetched product data:', response.data);
-    return response.data;
+    console.log(`Successfully fetched product data for ${productName}`);
+
+    // Log what we received to debug
+    const productData = response.data;
+    console.log(`Product ${productName} details:`, {
+      hasDescription: !!productData.description,
+      descriptionLength: productData.description?.length || 0,
+      hasEnvironments: !!productData.environments,
+      environmentsCount: productData.environments?.length || 0,
+      environments: productData.environments
+    });
+
+    return productData;
   } catch (error) {
-    console.error('Error fetching product:', error.message);
-    console.error('Status code:', error.response?.status);
-    console.error('Response data:', error.response?.data);
+    console.error(`Error fetching product ${productName}:`, error.message);
+
+    if (error.response) {
+      console.error('Response status:', error.response.status);
+      console.error('Response data:', error.response.data);
+    }
 
     const statusCode = error.response?.status || 500;
     const errorMessage = error.response?.data?.error?.message || error.message;

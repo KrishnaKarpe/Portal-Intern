@@ -27,6 +27,7 @@ const ListProducts = () => {
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [expandedApiSources, setExpandedApiSources] = useState(new Set());
 
+  // Add this debug function to see what we're receiving
   const handleSearch = async () => {
     if (!selectedOrg) {
       toast.error('Please select an organization');
@@ -49,6 +50,11 @@ const ListProducts = () => {
       const orgName = organizations.find(org => org.id.toString() === selectedOrg)?.name || selectedOrg;
       const fetchedProducts = await getAllProductsFromOrganization(orgName, token);
 
+      // Debug: Log what we received
+      console.log('Raw fetched products:', fetchedProducts);
+      console.log('Sample product:', fetchedProducts[0]);
+
+      // Apply search filter if search term is provided
       const filteredProducts = searchTerm 
         ? fetchedProducts.filter(product => 
             product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -57,6 +63,21 @@ const ListProducts = () => {
           )
         : fetchedProducts;
 
+      // Debug: Check if products have descriptions and environments
+      const productsWithDescription = filteredProducts.filter(p => p.description && p.description !== '');
+      const productsWithEnvironments = filteredProducts.filter(p => p.environments && p.environments.length > 0);
+      
+      console.log(`Products with descriptions: ${productsWithDescription.length}/${filteredProducts.length}`);
+      console.log(`Products with environments: ${productsWithEnvironments.length}/${filteredProducts.length}`);
+
+      if (filteredProducts.length > 0) {
+        console.log('First product sample:', {
+          name: filteredProducts[0].name,
+          description: filteredProducts[0].description,
+          environments: filteredProducts[0].environments
+        });
+      }
+
       setProducts(filteredProducts);
       
       if (filteredProducts.length === 0 && searchTerm) {
@@ -64,7 +85,7 @@ const ListProducts = () => {
       } else if (filteredProducts.length === 0) {
         toast.info('No products found for the selected organization');
       } else {
-        toast.success(`Found ${filteredProducts.length} products`);
+        toast.success(`Found ${filteredProducts.length} products (${productsWithDescription.length} with descriptions, ${productsWithEnvironments.length} with environments)`);
       }
     } catch (error) {
       console.error('Error fetching products:', error);
@@ -131,8 +152,8 @@ const ListProducts = () => {
           <TableRow>
             <TableHead>Name</TableHead>
             <TableHead>Display Name</TableHead>
-            <TableHead>Description</TableHead>
-            <TableHead>Environments</TableHead>
+            {/* <TableHead>Description</TableHead>
+            <TableHead>Environments</TableHead> */}
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
@@ -151,12 +172,12 @@ const ListProducts = () => {
               >
                 <TableCell className="font-medium">{product.name}</TableCell>
                 <TableCell>{product.displayName}</TableCell>
-                <TableCell className="max-w-xs">
+                {/* <TableCell className="max-w-xs">
                   <div className="truncate" title={product.description}>
                     {product.description || 'No description'}
                   </div>
-                </TableCell>
-                <TableCell>
+                </TableCell> */}
+                {/* <TableCell>
                   <div className="flex flex-wrap gap-1">
                     {product.environments && product.environments.length > 0 ? (
                       <>
@@ -179,7 +200,7 @@ const ListProducts = () => {
                       <span className="text-gray-500 text-xs">No environments</span>
                     )}
                   </div>
-                </TableCell>
+                </TableCell> */}
                 <TableCell className="text-right">
                   <Button 
                     variant="outline" 
@@ -358,15 +379,15 @@ const ListProducts = () => {
                 </div>
               </div>
 
-              <div>
+              {/* <div>
                 <label className="text-sm font-medium text-gray-700">Description</label>
                 <p className="mt-1 text-gray-900 bg-gray-50 p-3 rounded-lg">
                   {viewingProduct.description || 'No description available'}
                 </p>
-              </div>
+              </div> */}
 
               {/* Environments */}
-              <div>
+              {/* <div>
                 <label className="text-sm font-medium text-gray-700 flex items-center gap-1 mb-3">
                   <Globe className="h-4 w-4" />
                   Environments ({viewingProduct.environments?.length || 0})
@@ -388,7 +409,7 @@ const ListProducts = () => {
                     </span>
                   )}
                 </div>
-              </div>
+              </div> */}
 
               {/* API Operations - Grouped by API Source */}
               {viewingProduct.apiOperations && viewingProduct.apiOperations.length > 0 && (
