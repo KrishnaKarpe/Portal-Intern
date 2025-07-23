@@ -223,7 +223,7 @@ const getAllProductsFromOrganization = async (req, res) => {
 };
 
 /**
- * Get detailed product information for viewing with specific data extraction
+ * Get detailed product information for viewing with grouped API source data
  * @param {Object} req - Express request object  
  * @param {Object} res - Express response object
  */
@@ -242,45 +242,37 @@ const getProductForView = async (req, res) => {
     console.log('Fetching product for view:', { orgId, productName });
     const productDetails = await fetchProductFromOrg(orgId, productName, token);
 
-    // Extract specific data as per your requirements
+    // Extract specific data as per your requirements with grouped structure
     const transformedProduct = {
       name: productDetails.name,
       displayName: productDetails.displayName || productDetails.name,
       description: productDetails.description || '',
       environments: productDetails.environments || [],
 
-      // Extract operation group data
-      apiSources: [],
-      resources: [],
-      methods: []
+      // Group operation data by API source
+      apiOperations: []
     };
 
     // Process operation group if it exists
     if (productDetails.operationGroup && productDetails.operationGroup.operationConfigs) {
-      productDetails.operationGroup.operationConfigs.forEach(config => {
-        if (config.apiSource) {
-          transformedProduct.apiSources.push(config.apiSource);
+      transformedProduct.apiOperations = productDetails.operationGroup.operationConfigs.map(config => {
+        const apiOperation = {
+          apiSource: config.apiSource || 'Unknown API Source',
+          operations: []
+        };
+
+        if (config.operations && Array.isArray(config.operations)) {
+          apiOperation.operations = config.operations.map(operation => ({
+            resource: operation.resource || '',
+            methods: operation.methods || []
+          }));
         }
 
-        if (config.operations) {
-          config.operations.forEach(operation => {
-            if (operation.resource) {
-              transformedProduct.resources.push(operation.resource);
-            }
-            if (operation.methods) {
-              transformedProduct.methods.push(...operation.methods);
-            }
-          });
-        }
+        return apiOperation;
       });
     }
 
-    // Remove duplicates
-    transformedProduct.apiSources = [...new Set(transformedProduct.apiSources)];
-    transformedProduct.resources = [...new Set(transformedProduct.resources)];
-    transformedProduct.methods = [...new Set(transformedProduct.methods)];
-
-    console.log('Transformed product for view:', transformedProduct);
+    console.log('Transformed product for view with grouped operations:', transformedProduct);
 
     return res.status(200).json({
       success: true,

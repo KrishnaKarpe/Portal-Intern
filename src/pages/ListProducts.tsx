@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Badge } from "@/components/ui/badge";
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
-import { Search, RefreshCw, Eye, AlertCircle, Package, X, Code, Globe, Settings } from 'lucide-react';
+import { Search, RefreshCw, Eye, AlertCircle, Package, X, Code, Globe, Settings, ChevronDown, ChevronRight } from 'lucide-react';
 import { getAllProductsFromOrganization, getProductForView } from '@/services/api';
 
 const organizations = [
@@ -25,6 +25,7 @@ const ListProducts = () => {
   const [viewingProduct, setViewingProduct] = useState(null);
   const [isViewLoading, setIsViewLoading] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [expandedApiSources, setExpandedApiSources] = useState(new Set());
 
   const handleSearch = async () => {
     if (!selectedOrg) {
@@ -45,12 +46,9 @@ const ListProducts = () => {
         token: token.substring(0, 20) + '...'
       });
 
-      // Get the organization name (not the ID)
       const orgName = organizations.find(org => org.id.toString() === selectedOrg)?.name || selectedOrg;
-      
       const fetchedProducts = await getAllProductsFromOrganization(orgName, token);
 
-      // Apply search filter if search term is provided
       const filteredProducts = searchTerm 
         ? fetchedProducts.filter(product => 
             product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -87,7 +85,6 @@ const ListProducts = () => {
     setIsViewDialogOpen(true);
 
     try {
-      // Get the organization name
       const orgName = organizations.find(org => org.id.toString() === selectedOrg)?.name || selectedOrg;
       
       console.log('Fetching detailed view for:', {
@@ -99,6 +96,9 @@ const ListProducts = () => {
       const productDetails = await getProductForView(orgName, product.name, token);
       setViewingProduct(productDetails);
       
+      // Reset expanded state when new product is loaded
+      setExpandedApiSources(new Set());
+      
       toast.success(`Loaded details for ${product.name}`);
     } catch (error) {
       console.error('Error fetching product details:', error);
@@ -107,6 +107,16 @@ const ListProducts = () => {
     } finally {
       setIsViewLoading(false);
     }
+  };
+
+  const toggleApiSourceExpansion = (apiSource) => {
+    const newExpanded = new Set(expandedApiSources);
+    if (newExpanded.has(apiSource)) {
+      newExpanded.delete(apiSource);
+    } else {
+      newExpanded.add(apiSource);
+    }
+    setExpandedApiSources(newExpanded);
   };
 
   const getOrgName = (orgId) => {
@@ -303,7 +313,7 @@ const ListProducts = () => {
 
       {/* Product View Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
               <span className="flex items-center gap-2">
@@ -380,78 +390,109 @@ const ListProducts = () => {
                 </div>
               </div>
 
-              {/* API Sources */}
-              {viewingProduct.apiSources && viewingProduct.apiSources.length > 0 && (
+              {/* API Operations - Grouped by API Source */}
+              {viewingProduct.apiOperations && viewingProduct.apiOperations.length > 0 && (
                 <div>
-                  <label className="text-sm font-medium text-gray-700 flex items-center gap-1 mb-3">
+                  <label className="text-sm font-medium text-gray-700 flex items-center gap-1 mb-4">
                     <Code className="h-4 w-4" />
-                    API Sources ({viewingProduct.apiSources.length})
+                    API Operations ({viewingProduct.apiOperations.length} API Source{viewingProduct.apiOperations.length > 1 ? 's' : ''})
                   </label>
-                  <div className="space-y-2">
-                    {viewingProduct.apiSources.map((source, index) => (
-                      <div key={index} className="flex items-center gap-2 bg-blue-50 p-2 rounded">
-                        <Code className="h-4 w-4 text-blue-600" />
-                        <span className="font-mono text-sm">{source}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Resources */}
-              {viewingProduct.resources && viewingProduct.resources.length > 0 && (
-                <div>
-                  <label className="text-sm font-medium text-gray-700 flex items-center gap-1 mb-3">
-                    <Settings className="h-4 w-4" />
-                    Resources ({viewingProduct.resources.length})
-                  </label>
-                  <div className="space-y-1">
-                    {viewingProduct.resources.map((resource, index) => (
-                      <div key={index} className="bg-gray-50 p-2 rounded font-mono text-sm">
-                        {resource}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* HTTP Methods */}
-              {viewingProduct.methods && viewingProduct.methods.length > 0 && (
-                <div>
-                  <label className="text-sm font-medium text-gray-700 flex items-center gap-1 mb-3">
-                    <Globe className="h-4 w-4" />
-                    HTTP Methods ({viewingProduct.methods.length})
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {viewingProduct.methods.map((method, index) => {
-                      const methodColors = {
-                        'GET': 'bg-green-100 text-green-800',
-                        'POST': 'bg-blue-100 text-blue-800',
-                        'PUT': 'bg-orange-100 text-orange-800',
-                        'DELETE': 'bg-red-100 text-red-800',
-                        'PATCH': 'bg-purple-100 text-purple-800'
-                      };
-                      
-                      return (
-                        <Badge 
-                          key={index}
-                          className={`px-3 py-1 text-sm font-semibold ${methodColors[method] || 'bg-gray-100 text-gray-800'}`}
+                  
+                  <div className="space-y-4">
+                    {viewingProduct.apiOperations.map((apiOp, index) => (
+                      <div key={index} className="border border-gray-200 rounded-lg">
+                        {/* API Source Header */}
+                        <div 
+                          className="flex items-center justify-between p-3 bg-blue-50 border-b cursor-pointer hover:bg-blue-100 transition-colors"
+                          onClick={() => toggleApiSourceExpansion(apiOp.apiSource)}
                         >
-                          {method}
-                        </Badge>
-                      );
-                    })}
+                          <div className="flex items-center gap-2">
+                            <Code className="h-4 w-4 text-blue-600" />
+                            <span className="font-semibold text-blue-800">
+                              {apiOp.apiSource || 'Unknown API Source'}
+                            </span>
+                            <Badge variant="secondary" className="bg-blue-200 text-blue-800 text-xs">
+                              {apiOp.operations?.length || 0} operation{(apiOp.operations?.length || 0) !== 1 ? 's' : ''}
+                            </Badge>
+                          </div>
+                          {expandedApiSources.has(apiOp.apiSource) ? (
+                            <ChevronDown className="h-4 w-4 text-blue-600" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 text-blue-600" />
+                          )}
+                        </div>
+
+                        {/* Expandable Operations Content */}
+                        {expandedApiSources.has(apiOp.apiSource) && (
+                          <div className="p-4 space-y-3">
+                            {apiOp.operations && apiOp.operations.length > 0 ? (
+                              apiOp.operations.map((operation, opIndex) => (
+                                <div key={opIndex} className="bg-gray-50 p-3 rounded-md">
+                                  <div className="flex items-start justify-between gap-4">
+                                    {/* Resource */}
+                                    <div className="flex-1">
+                                      <label className="text-xs font-medium text-gray-600 uppercase tracking-wide">
+                                        Resource
+                                      </label>
+                                      <p className="mt-1 text-sm font-mono bg-white p-2 rounded border">
+                                        {operation.resource || 'No resource specified'}
+                                      </p>
+                                    </div>
+
+                                    {/* Methods */}
+                                    <div className="flex-1">
+                                      <label className="text-xs font-medium text-gray-600 uppercase tracking-wide">
+                                        Methods ({operation.methods?.length || 0})
+                                      </label>
+                                      <div className="mt-2 flex flex-wrap gap-1">
+                                        {operation.methods && operation.methods.length > 0 ? (
+                                          operation.methods.map((method, methodIndex) => {
+                                            const methodColors = {
+                                              'GET': 'bg-green-100 text-green-800 border-green-200',
+                                              'POST': 'bg-blue-100 text-blue-800 border-blue-200',
+                                              'PUT': 'bg-orange-100 text-orange-800 border-orange-200',
+                                              'DELETE': 'bg-red-100 text-red-800 border-red-200',
+                                              'PATCH': 'bg-purple-100 text-purple-800 border-purple-200'
+                                            };
+                                            
+                                            return (
+                                              <Badge 
+                                                key={methodIndex}
+                                                className={`px-2 py-1 text-xs font-semibold border ${methodColors[method] || 'bg-gray-100 text-gray-800 border-gray-200'}`}
+                                              >
+                                                {method}
+                                              </Badge>
+                                            );
+                                          })
+                                        ) : (
+                                          <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                                            No methods specified
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))
+                            ) : (
+                              <div className="text-center py-4 text-gray-500 bg-gray-50 rounded">
+                                <Code className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                                <p className="text-sm">No operations defined for this API source</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
 
               {/* No Data Message */}
-              {(!viewingProduct.apiSources || viewingProduct.apiSources.length === 0) && 
-               (!viewingProduct.resources || viewingProduct.resources.length === 0) && 
-               (!viewingProduct.methods || viewingProduct.methods.length === 0) && (
-                <div className="text-center py-6 bg-gray-50 rounded-lg">
+              {(!viewingProduct.apiOperations || viewingProduct.apiOperations.length === 0) && (
+                <div className="text-center py-8 bg-gray-50 rounded-lg">
                   <Package className="h-12 w-12 mx-auto text-gray-400 mb-2" />
-                  <p className="text-gray-600">No operation configuration data available</p>
+                  <p className="text-gray-600">No API operation configuration data available</p>
                 </div>
               )}
             </div>
@@ -488,7 +529,7 @@ const ListProducts = () => {
               <h3 className="font-semibold text-gray-900">{feature.title}</h3>
               <p className="text-sm text-gray-600">{feature.description}</p>
             </Card>
-          ))}
+        ))}
       </div>
     </motion.div>
   );
