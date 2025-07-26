@@ -9,7 +9,9 @@ import CloneSuccess from "./pages/CloneSuccess";
 import UpdateProduct from "./pages/UpdateProduct";
 import ListProxies from "./pages/ListProxies";
 import ListProducts from "./pages/ListProducts";
+import MoveProxy from "./pages/moveProxy";
 import NotFound from "./pages/NotFound";
+import CloneproxySuccess from "@/pages/CloneproxySuccess";
 
 const queryClient = new QueryClient();
 
@@ -26,6 +28,8 @@ const App = () => (
           <Route path="/update-product" element={<MainLayout><UpdateProduct /></MainLayout>} />
           <Route path="/list-proxies" element={<MainLayout><ListProxies /></MainLayout>} />
           <Route path="/list-products" element={<MainLayout><ListProducts /></MainLayout>} />
+          <Route path="/move-proxy" element={<MainLayout><MoveProxy /></MainLayout>} /> {/* ✅ ADD: MoveProxy route */}
+          <Route path="/clone-proxy-success" element={<MainLayout><CloneproxySuccess /></MainLayout>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -30,6 +29,11 @@ const menuItems = [
   {
     name: 'List All Products',
     path: '/list-products',
+    icon: <Package className="h-5 w-5 mr-3" />,
+  },
+  {
+    name: 'Move Proxy Across Orgs',
+    path: '/move-proxy',
     icon: <Package className="h-5 w-5 mr-3" />,
   },
 ];

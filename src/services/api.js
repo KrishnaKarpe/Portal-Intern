@@ -124,3 +124,81 @@ export const getProductsByOrganization = async (orgId) => {
   }
 };
 
+/**
+ * Move a proxy from one organization to another
+ * @param {Object} proxyData - Proxy data to move
+ * @returns {Promise<Object>} API response
+ */
+export const MoveProxy = async (proxyData) => {
+  try {
+    const response = await fetch(`${API_URL}/proxy/move`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(proxyData),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to move proxy');
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error moving proxy:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get all proxies from an organization
+ * @param {string} orgId - Organization ID
+ * @param {string} token - Authentication token
+ * @returns {Promise<Array>} List of proxies
+ */
+export const getAllProxiesFromOrganization = async (orgId, token) => {
+  try {
+    const response = await fetch(
+      `${API_URL}/proxy/by-organization/${orgId}?token=${encodeURIComponent(token)}`
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to fetch proxies');
+    }
+
+    return data.data || [];
+  } catch (error) {
+    console.error('Error fetching proxies:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get environments for an organization
+ * @param {string} orgId - Organization ID
+ * @param {string} token - Authentication token
+ * @returns {Promise<Array>} List of environments
+ */
+export const getOrganizationEnvironments = async (orgId, token) => {
+  try {
+    const response = await fetch(
+      `${API_URL}/proxy/environments/${orgId}?token=${encodeURIComponent(token)}`
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to fetch environments');
+    }
+
+    return data.data || [];
+  } catch (error) {
+    console.error('Error fetching environments:', error);
+    throw error;
+  }
+};
+

@@ -194,7 +194,7 @@ const deployProxyToEnvironments = async (orgId, proxyName, revision, environment
                     'Content-Type': 'application/json'
                 },
                 data: {
-                    override: true  // ✅ ONLY use override - remove delay and basePath
+                    override: true
                 },
                 timeout: 45000
             });
@@ -219,18 +219,35 @@ const deployProxyToEnvironments = async (orgId, proxyName, revision, environment
 
             let errorMessage = error.message;
             let suggestion = '';
+            let errorType = 'Unknown';
 
-            // Provide specific error messages based on status code
+            // Enhanced error handling based on Apigee-specific errors
             if (error.response?.status === 400) {
-                errorMessage = 'Bad Request - Environment may not exist or invalid deployment parameters';
-                suggestion = `Verify that environment '${envName}' exists in organization '${orgId}'`;
+                const errorData = error.response.data?.error;
+
+                if (errorData?.status === 'FAILED_PRECONDITION') {
+                    errorType = 'Validation Failed';
+                    errorMessage = 'Deployment validation failed - environment configuration issue';
+                    suggestion = `Environment '${envName}' may have validation rules that this proxy doesn't meet. Check environment policies and configurations.`;
+                } else if (errorData?.message?.includes('deployment validations failed')) {
+                    errorType = 'Validation Failed';
+                    errorMessage = 'Proxy validation failed for this environment';
+                    suggestion = `The proxy may be missing required policies, resources, or have configuration issues specific to '${envName}' environment.`;
+                } else {
+                    errorType = 'Bad Request';
+                    errorMessage = 'Bad Request - Environment may not exist or proxy cannot be deployed';
+                    suggestion = `Verify that environment '${envName}' exists and accepts deployments.`;
+                }
             } else if (error.response?.status === 401) {
+                errorType = 'Authentication';
                 errorMessage = 'Unauthorized - Check your authentication token';
                 suggestion = 'Ensure your token has deployment permissions';
             } else if (error.response?.status === 403) {
+                errorType = 'Permission';
                 errorMessage = 'Forbidden - Insufficient permissions';
-                suggestion = 'Your token may not have deployment permissions for this environment';
+                suggestion = `Your token may not have deployment permissions for environment '${envName}'`;
             } else if (error.response?.status === 404) {
+                errorType = 'Not Found';
                 errorMessage = 'Not Found - Environment or proxy does not exist';
                 suggestion = `Check if environment '${envName}' exists and proxy was successfully imported`;
             }
@@ -239,11 +256,24 @@ const deployProxyToEnvironments = async (orgId, proxyName, revision, environment
                 environment: envName,
                 status: 'failed',
                 error: errorMessage,
+                errorType: errorType,
                 suggestion: suggestion,
                 statusCode: error.response?.status || 'Unknown',
-                details: error.response?.data
+                details: error.response?.data?.error || error.response?.data
             });
         }
+    }
+
+    // ✅ ADD: Summary logging
+    const successful = deploymentResults.filter(r => r.status === 'deployed');
+    const failed = deploymentResults.filter(r => r.status === 'failed');
+
+    console.log(`📊 Deployment Summary: ${successful.length} successful, ${failed.length} failed`);
+    if (successful.length > 0) {
+        console.log(`✅ Successfully deployed to: ${successful.map(r => r.environment).join(', ')}`);
+    }
+    if (failed.length > 0) {
+        console.log(`❌ Failed to deploy to: ${failed.map(r => r.environment).join(', ')}`);
     }
 
     return deploymentResults;
