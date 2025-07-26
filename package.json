@@ -1,5 +1,5 @@
 {
-  "name": "vite_react_shadcn_ts",
+  "name": "prod-tononprod-move",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -44,6 +44,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.0.0",
+    "concurrently": "^9.2.0",
     "date-fns": "^3.6.0",
     "embla-carousel-react": "^8.3.0",
     "framer-motion": "^11.18.2",
@@ -81,5 +82,17 @@
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.0.1",
     "vite": "^5.4.1"
-  }
+  },
+  "description": "",
+  "main": "eslint.config.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KrishnaKarpe/Portal-Intern.git"
+  },
+  "author": "tejaswini durge",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/KrishnaKarpe/Portal-Intern/issues"
+  },
+  "homepage": "https://github.com/KrishnaKarpe/Portal-Intern#readme"
 }
