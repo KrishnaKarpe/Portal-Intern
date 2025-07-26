@@ -130,11 +130,11 @@ const CloneproxySuccess = () => {
                           variant={result.status === 'deployed' ? 'default' : 'destructive'}
                           className={result.status === 'deployed' ? 'bg-green-100 text-green-800' : ''}
                         >
-                          {result.status === 'deployed' ? '✅ Deployed' : '❌ Failed'}
+                          {result.status === 'deployed' ? '    Deployed' : '❌ Failed'}
                         </Badge>
                       </div>
                       
-                      {/* ✅ ADD: Show error details for failed deployments */}
+                      {/*     ADD: Show error details for failed deployments */}
                       {result.status === 'failed' && (
                         <div className="mt-2 text-sm">
                           <div className="text-red-600 font-medium">{result.errorType || 'Error'}</div>
@@ -153,7 +153,7 @@ const CloneproxySuccess = () => {
                 <div className="text-sm text-gray-600 mt-3 p-3 bg-gray-50 rounded">
                   <div className="font-medium text-gray-800 mb-1">Summary:</div>
                   <div className="flex gap-4">
-                    <span className="text-green-600">✅ {proxyData.summary.deployedEnvironments} deployed</span>
+                    <span className="text-green-600">    {proxyData.summary.deployedEnvironments} deployed</span>
                     <span className="text-red-600">❌ {proxyData.summary.failedEnvironments} failed</span>
                   </div>
                   {proxyData.summary.deployedEnvironments > 0 && (

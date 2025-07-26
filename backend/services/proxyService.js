@@ -206,7 +206,7 @@ const deployProxyToEnvironments = async (orgId, proxyName, revision, environment
                 message: `Successfully deployed to ${envName}`
             });
 
-            console.log(`✅ Successfully deployed to ${envName}`);
+            console.log(`    Successfully deployed to ${envName}`);
 
         } catch (error) {
             console.error(`❌ Failed to deploy to ${envName}:`, error.message);
@@ -264,13 +264,13 @@ const deployProxyToEnvironments = async (orgId, proxyName, revision, environment
         }
     }
 
-    // ✅ ADD: Summary logging
+    //     ADD: Summary logging
     const successful = deploymentResults.filter(r => r.status === 'deployed');
     const failed = deploymentResults.filter(r => r.status === 'failed');
 
     console.log(`📊 Deployment Summary: ${successful.length} successful, ${failed.length} failed`);
     if (successful.length > 0) {
-        console.log(`✅ Successfully deployed to: ${successful.map(r => r.environment).join(', ')}`);
+        console.log(`    Successfully deployed to: ${successful.map(r => r.environment).join(', ')}`);
     }
     if (failed.length > 0) {
         console.log(`❌ Failed to deploy to: ${failed.map(r => r.environment).join(', ')}`);
@@ -309,7 +309,7 @@ const moveProxyService = async (moveData) => {
         console.log('📦 Step 1: Exporting proxy from source organization...');
         const proxyBundle = await fetchProxyFromOrg(sourceOrg, proxyName, sourceToken, revision);
 
-        console.log('✅ Proxy exported successfully');
+        console.log('    Proxy exported successfully');
         console.log('Export details:', {
             size: `${(proxyBundle.size / 1024).toFixed(2)} KB`,
             revision: proxyBundle.revision,
@@ -325,7 +325,7 @@ const moveProxyService = async (moveData) => {
             targetToken
         );
 
-        console.log('✅ Proxy imported successfully');
+        console.log('    Proxy imported successfully');
 
         // Step 3: Deploy to environments (if specified)
         let deploymentResults = [];
@@ -343,7 +343,7 @@ const moveProxyService = async (moveData) => {
                 targetToken
             );
 
-            console.log('✅ Deployment completed');
+            console.log('    Deployment completed');
         } else {
             console.log('⏭️ Step 3: Skipping deployment (no environments specified)');
         }
@@ -399,12 +399,12 @@ const getAllProxiesService = async (orgId, token) => {
 
         console.log('Successfully fetched proxies list');
 
-        // ✅ DEBUG: Log the actual Apigee response structure
+        //     DEBUG: Log the actual Apigee response structure
         console.log('Raw Apigee response:', response.data);
         console.log('Response type:', typeof response.data);
         console.log('Is array:', Array.isArray(response.data));
 
-        // ✅ FIX: Handle different Apigee response structures
+        //    FIX: Handle different Apigee response structures
         let proxies = [];
 
         if (Array.isArray(response.data)) {
@@ -446,7 +446,7 @@ const getAllProxiesService = async (orgId, token) => {
         console.log('Extracted proxies:', proxies);
         console.log('Proxies count:', proxies.length);
 
-        // ✅ VALIDATE: Ensure we have an array of strings
+        //     VALIDATE: Ensure we have an array of strings
         if (!Array.isArray(proxies)) {
             console.error('Failed to extract proxy array from response');
             throw new Error('Invalid response from Apigee API: could not extract proxy list');
@@ -526,5 +526,5 @@ module.exports = {
     fetchProxyFromOrg,
     sendProxyToOrg,
     deployProxyToEnvironments,
-    getOrganizationEnvironments  // ✅ ADD this
+    getOrganizationEnvironments  //     ADD this
 };

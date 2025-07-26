@@ -19,7 +19,7 @@ import {
 import { 
   getOrganizations, 
   MoveProxy as apiMoveProxy,
-  getOrganizationEnvironments  // ✅ ADD this import
+  getOrganizationEnvironments  //     ADD this import
 } from '@/services/api';
 
 const MoveProxy = () => {
@@ -464,7 +464,7 @@ const MoveProxy = () => {
                 </Button>
               </div>
 
-              {/* ✅ ADD: Proxy name validation for same org */}
+              {/*     ADD: Proxy name validation for same org */}
               {sourceOrg === targetOrg && formData.proxyName && formData.newProxyName && (
                 <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
                   <span className="text-sm text-blue-800 font-medium">

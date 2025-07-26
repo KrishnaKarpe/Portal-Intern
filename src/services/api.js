@@ -170,7 +170,7 @@ export const getAllProxiesFromOrganization = async (orgId, token) => {
       throw new Error(data.message || 'Failed to fetch proxies');
     }
 
-    // ✅ The backend sends: { success: true, data: [...proxies], message: "..." }
+    //     The backend sends: { success: true, data: [...proxies], message: "..." }
     // So we need data.data, not just data
     return data.data || [];
   } catch (error) {

@@ -5,7 +5,7 @@
 const {
   moveProxyService,
   getAllProxiesService,
-  getOrganizationEnvironments  // ✅ ADD this import
+  getOrganizationEnvironments  //     ADD this import
 } = require('../services/proxyService');
 
 const {
@@ -99,7 +99,7 @@ const getAllProxiesFromOrganization = async (req, res) => {
 
     const result = await getAllProxiesService(orgId, token);
 
-    // ✅ ADD: Debug logging to see what service returns
+    //     ADD: Debug logging to see what service returns
     console.log('Service result:', result);
     console.log('Service result structure:', {
       hasProxies: !!result.proxies,
@@ -108,7 +108,7 @@ const getAllProxiesFromOrganization = async (req, res) => {
       proxiesLength: result.proxies?.length || 0
     });
 
-    // ✅ FIX: Make sure we're sending the right data structure
+    //     FIX: Make sure we're sending the right data structure
     return sendSuccess(res, result.proxies, result.message, 200);
   } catch (error) {
     console.error('Error fetching proxies:', error);
@@ -150,5 +150,5 @@ const getEnvironmentsFromOrganization = async (req, res) => {
 module.exports = {
   moveProxy,
   getAllProxiesFromOrganization,
-  getEnvironmentsFromOrganization  // ✅ ADD this
+  getEnvironmentsFromOrganization  //     ADD this
 };
