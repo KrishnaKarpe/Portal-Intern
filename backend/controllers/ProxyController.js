@@ -98,6 +98,17 @@ const getAllProxiesFromOrganization = async (req, res) => {
     }
 
     const result = await getAllProxiesService(orgId, token);
+
+    // ✅ ADD: Debug logging to see what service returns
+    console.log('Service result:', result);
+    console.log('Service result structure:', {
+      hasProxies: !!result.proxies,
+      proxiesType: typeof result.proxies,
+      isArray: Array.isArray(result.proxies),
+      proxiesLength: result.proxies?.length || 0
+    });
+
+    // ✅ FIX: Make sure we're sending the right data structure
     return sendSuccess(res, result.proxies, result.message, 200);
   } catch (error) {
     console.error('Error fetching proxies:', error);

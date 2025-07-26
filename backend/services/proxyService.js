@@ -398,22 +398,84 @@ const getAllProxiesService = async (orgId, token) => {
         });
 
         console.log('Successfully fetched proxies list');
-        const proxies = response.data || [];
 
-        const transformedProxies = proxies.map((proxyName, index) => ({
-            id: index + 1,
-            name: proxyName,
-            orgId: orgId
-        }));
+        // ✅ DEBUG: Log the actual Apigee response structure
+        console.log('Raw Apigee response:', response.data);
+        console.log('Response type:', typeof response.data);
+        console.log('Is array:', Array.isArray(response.data));
+
+        // ✅ FIX: Handle different Apigee response structures
+        let proxies = [];
+
+        if (Array.isArray(response.data)) {
+            // Direct array of proxy names
+            proxies = response.data;
+        } else if (response.data && Array.isArray(response.data.proxies)) {
+            // Wrapped in proxies property
+            proxies = response.data.proxies;
+        } else if (response.data && Array.isArray(response.data.apiProxy)) {
+            // Some Apigee APIs return apiProxy array
+            proxies = response.data.apiProxy;
+        } else if (response.data && response.data.name) {
+            // Single proxy object
+            proxies = [response.data.name];
+        } else if (response.data === null || response.data === undefined) {
+            // Empty response
+            proxies = [];
+        } else {
+            // Log unexpected structure for debugging
+            console.error('Unexpected Apigee API response structure:', {
+                data: response.data,
+                keys: Object.keys(response.data || {}),
+                type: typeof response.data
+            });
+
+            // Try to extract proxy names from any array-like property
+            const dataObj = response.data || {};
+            const arrayKeys = Object.keys(dataObj).filter(key => Array.isArray(dataObj[key]));
+
+            if (arrayKeys.length > 0) {
+                console.log('Found array properties:', arrayKeys);
+                proxies = dataObj[arrayKeys[0]] || [];
+            } else {
+                console.warn('No array found in response, treating as empty');
+                proxies = [];
+            }
+        }
+
+        console.log('Extracted proxies:', proxies);
+        console.log('Proxies count:', proxies.length);
+
+        // ✅ VALIDATE: Ensure we have an array of strings
+        if (!Array.isArray(proxies)) {
+            console.error('Failed to extract proxy array from response');
+            throw new Error('Invalid response from Apigee API: could not extract proxy list');
+        }
+
+        // Transform the proxy names into objects for frontend
+        const transformedProxies = proxies.map((proxyName, index) => {
+            // Handle case where proxy might be an object instead of string
+            const name = typeof proxyName === 'string' ? proxyName : proxyName.name || proxyName.toString();
+
+            return {
+                id: index + 1,
+                name: name,
+                orgId: orgId
+            };
+        });
 
         console.log(`Transformed ${transformedProxies.length} proxies for frontend`);
 
-        return {
+        // Return the structured result
+        const result = {
             proxies: transformedProxies,
             total: transformedProxies.length,
             organization: orgId,
             message: `Found ${transformedProxies.length} proxies`
         };
+
+        console.log('Service returning:', result);
+        return result;
 
     } catch (error) {
         console.error('Error fetching proxies:', error.message);

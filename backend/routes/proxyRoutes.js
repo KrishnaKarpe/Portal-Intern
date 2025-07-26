@@ -17,7 +17,7 @@ router.post('/move', moveProxy);
 // Proxy listing
 router.get('/by-organization/:orgId', getAllProxiesFromOrganization);
 
-// Environment listing
-router.get('/environments/:orgId', getEnvironmentsFromOrganization);
+// // Environment listing
+// router.get('/environments/:orgId', getEnvironmentsFromOrganization);
 
 module.exports = router;
