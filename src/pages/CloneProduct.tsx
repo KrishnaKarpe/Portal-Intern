@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -27,9 +27,14 @@ const organizations = [
 ];
 
 const availableEnvironments = [
-  { id: 1, name: 'apim-dev', type: 'Development' },
-  { id: 2, name: 'apim-uat-internal', type: 'UAT Internal' },
-  { id: 3, name: 'apim-uat-public', type: 'UAT Public' },
+  // Non-Production environments
+  { id: 1, name: 'apim-dev', type: 'Development', category: 'non-prod' },
+  { id: 2, name: 'apim-uat-internal', type: 'UAT Internal', category: 'non-prod' },
+  { id: 3, name: 'apim-uat-public', type: 'UAT Public', category: 'non-prod' },
+  // Production environments
+  { id: 4, name: 'apim-prod-internal', type: 'Production Internal', category: 'prod' },
+  { id: 5, name: 'apim-prod-public', type: 'Production Public', category: 'prod' },
+  { id: 6, name: 'apim-prod-saas', type: 'Production SaaS', category: 'prod' },
 ];
 
 const CloneProduct = () => {
@@ -47,6 +52,26 @@ const CloneProduct = () => {
     description: '',
   });
 
+  // Filter environments based on target organization type
+  const filteredEnvironments = useMemo(() => {
+    if (!targetOrg) return availableEnvironments;
+    
+    const targetOrgData = organizations.find(org => org.name === targetOrg);
+    if (!targetOrgData) return availableEnvironments;
+    
+    // If target is Production org, show only production environments
+    if (targetOrgData.type === 'Production') {
+      return availableEnvironments.filter(env => env.category === 'prod');
+    }
+    
+    // If target is Non-Production org, show only non-production environments
+    if (targetOrgData.type === 'Non-Production') {
+      return availableEnvironments.filter(env => env.category === 'non-prod');
+    }
+    
+    return availableEnvironments;
+  }, [targetOrg]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -63,6 +88,13 @@ const CloneProduct = () => {
 
   const handleEnvironmentRemove = (environmentName: string) => {
     setSelectedEnvironments(selectedEnvironments.filter(env => env !== environmentName));
+  };
+
+  // Clear selected environments when target org changes
+  const handleTargetOrgChange = (orgName: string) => {
+    setTargetOrg(orgName);
+    // Clear selected environments since they might not be valid for the new target org
+    setSelectedEnvironments([]);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -192,7 +224,7 @@ const CloneProduct = () => {
                     <label className="text-sm font-medium text-gray-700">
                       Target Organization *
                     </label>
-                    <Select value={targetOrg} onValueChange={setTargetOrg}>
+                    <Select value={targetOrg} onValueChange={handleTargetOrgChange}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select target organization" />
                       </SelectTrigger>
@@ -264,13 +296,6 @@ const CloneProduct = () => {
                     )}
                   </div>
                 </div>
-
-                {/* <div className="flex items-start gap-2 p-3 bg-amber-50 rounded-lg border border-amber-200">
-                  <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
-                  <div className="text-sm text-amber-800">
-                    <strong>Security Note:</strong> Tokens are used for authentication only and are not stored.
-                  </div>
-                </div> */}
               </div>
 
               {/* Product Details Section */}
@@ -331,18 +356,35 @@ const CloneProduct = () => {
                   />
                 </div>
 
-                {/* Updated Environments Section */}
+                {/* Updated Environments Section with Smart Filtering */}
                 <div className="space-y-3">
                   <label className="text-sm font-medium text-gray-700">
                     Environments
+                    {targetOrg && (
+                      <span className="ml-2 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                        {organizations.find(org => org.name === targetOrg)?.type === 'Production' 
+                          ? 'Production environments only' 
+                          : 'Non-production environments only'
+                        }
+                      </span>
+                    )}
                   </label>
                   
-                  <Select onValueChange={handleEnvironmentSelect}>
+                  <Select 
+                    onValueChange={handleEnvironmentSelect}
+                    disabled={!targetOrg}
+                  >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select environments to add" />
+                      <SelectValue 
+                        placeholder={
+                          !targetOrg 
+                            ? "Select target organization first" 
+                            : "Select environments to add"
+                        } 
+                      />
                     </SelectTrigger>
                     <SelectContent>
-                      {availableEnvironments
+                      {filteredEnvironments
                         .filter(env => !selectedEnvironments.includes(env.name))
                         .map((env) => (
                           <SelectItem key={env.id} value={env.name}>
@@ -361,7 +403,7 @@ const CloneProduct = () => {
                       <p className="text-xs text-gray-600">Selected environments:</p>
                       <div className="flex flex-wrap gap-2">
                         {selectedEnvironments.map((envName) => {
-                          const env = availableEnvironments.find(e => e.name === envName);
+                          const env = filteredEnvironments.find(e => e.name === envName);
                           return (
                             <Badge 
                               key={envName} 
@@ -385,6 +427,11 @@ const CloneProduct = () => {
 
                   <p className="text-xs text-gray-500">
                     Select one or more environments for your cloned product
+                    {targetOrg && (
+                      <span className="block mt-1 font-medium">
+                        Only {organizations.find(org => org.name === targetOrg)?.type?.toLowerCase()} environments are available for the selected target organization.
+                      </span>
+                    )}
                   </p>
                 </div>
               </div>

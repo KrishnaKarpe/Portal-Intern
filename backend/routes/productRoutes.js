@@ -1,23 +1,24 @@
+/**
+ * Product Routes - All product-related API endpoints
+ * Handles: clone, update, list, view operations
+ */
+
 const express = require('express');
 const router = express.Router();
 const {
     cloneProduct,
     updateProduct,
-    getOrganizations,
     getAllProductsFromOrganization,
     getProductForView
 } = require('../controllers/productController');
 const { validateCloneProduct, validateUpdateProduct } = require('../middleware/validation');
 
-// Product operations
-router.post('/products/clone', validateCloneProduct, cloneProduct);
-router.put('/products/update', validateUpdateProduct, updateProduct);
+// Product CRUD operations
+router.post('/clone', validateCloneProduct, cloneProduct);
+router.put('/update', validateUpdateProduct, updateProduct);
 
-// Organization operations
-router.get('/products/organizations', getOrganizations);
-
-// Real API product operations
-router.get('/products/by-organization/:orgId', getAllProductsFromOrganization);
-router.get('/products/view/:orgId/:productName', getProductForView); // New view endpoint
+// Product listing and viewing
+router.get('/by-organization/:orgId', getAllProductsFromOrganization);
+router.get('/view/:orgId/:productName', getProductForView);
 
 module.exports = router;
