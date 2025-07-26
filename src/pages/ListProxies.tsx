@@ -1,67 +1,133 @@
-
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
-import { Search, RefreshCw } from 'lucide-react';
+import { Search, RefreshCw, Package, AlertCircle, Globe } from 'lucide-react';
+import { getAllProxiesFromOrganization } from '@/services/api';
 
 const organizations = [
   { id: 1, name: 'apigee-prod-ouax' },
   { id: 2, name: 'apigee-non-prod-crjb' },
- 
-];
-
-// Mock data for proxies
-const mockProxies = [
-  { id: 1, name: 'API Gateway Proxy', type: 'REST', environment: 'Production', status: 'Active', orgId: 1 },
-  { id: 2, name: 'Mobile API Proxy', type: 'REST', environment: 'Testing', status: 'Active', orgId: 1 },
-  { id: 3, name: 'Legacy System Proxy', type: 'SOAP', environment: 'Production', status: 'Inactive', orgId: 2 },
-  { id: 4, name: 'Partner Integration', type: 'GraphQL', environment: 'Development', status: 'Active', orgId: 3 },
-  { id: 5, name: 'Internal API', type: 'REST', environment: 'Production', status: 'Active', orgId: 4 },
 ];
 
 const ListProxies = () => {
   const [selectedOrg, setSelectedOrg] = useState("");
   const [token, setToken] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [proxies, setProxies] = useState<typeof mockProxies>([]);
+  const [allProxies, setAllProxies] = useState([]); // Store all fetched proxies
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSearch = () => {
+  // Real-time filtered proxies based on search term
+  const filteredProxies = useMemo(() => {
+    if (!searchTerm.trim()) return allProxies;
+    
+    return allProxies.filter(proxy => 
+      proxy.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [allProxies, searchTerm]);
+
+  const getOrgName = (orgId) => {
+    return organizations.find(org => org.id.toString() === orgId)?.name || 'Unknown';
+  };
+
+  const handleFetchProxies = async () => {
     if (!selectedOrg) {
       toast.error('Please select an organization');
       return;
     }
 
+    if (!token) {
+      toast.error('Please provide an authentication token');
+      return;
+    }
+
     setIsLoading(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      const orgId = parseInt(selectedOrg);
-      const filteredProxies = mockProxies
-        .filter(proxy => proxy.orgId === orgId)
-        .filter(proxy => 
-          proxy.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          proxy.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          proxy.environment.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-        
-      setProxies(filteredProxies);
-      setIsLoading(false);
+    try {
+      console.log('Fetching proxies for:', {
+        orgId: selectedOrg,
+        token: token.substring(0, 20) + '...'
+      });
+
+      const orgName = organizations.find(org => org.id.toString() === selectedOrg)?.name || selectedOrg;
+      const fetchedProxies = await getAllProxiesFromOrganization(orgName, token);
+
+      // Debug: Log what we received
+      console.log('Raw fetched proxies:', fetchedProxies);
       
-      if (filteredProxies.length === 0 && searchTerm) {
-        toast.info('No proxies match your search criteria');
-      } else if (filteredProxies.length === 0) {
-        toast.info('No proxies found for the selected organization');
-      } else {
-        toast.success(`Found ${filteredProxies.length} proxies`);
+      if (fetchedProxies.length > 0) {
+        console.log('Sample proxy data:', fetchedProxies[0]);
+        
+        // Show success message
+        toast.success(
+          `Found ${fetchedProxies.length} proxies in ${orgName}!`,
+          { duration: 4000 }
+        );
       }
-    }, 1000);
+
+      setAllProxies(fetchedProxies);
+      
+      if (fetchedProxies.length === 0) {
+        toast.info('No proxies found for the selected organization');
+      }
+      
+    } catch (error) {
+      console.error('Error fetching proxies:', error);
+      toast.error(error.message || 'Failed to fetch proxies');
+      setAllProxies([]);
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  const renderProxyTable = (proxiesToShow) => (
+    <Table>
+      <TableHeader>
+        <TableRow className="bg-gray-50">
+          <TableHead className="font-semibold">Proxy Name</TableHead>
+          <TableHead className="font-semibold">Organization</TableHead>
+          <TableHead className="font-semibold">ID</TableHead>
+          <TableHead className="font-semibold">Status</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {proxiesToShow.map((proxy) => (
+          <TableRow 
+            key={proxy.id}
+            className="hover:bg-gray-50 transition-colors cursor-pointer"
+          >
+            <TableCell className="font-medium">
+              <div className="flex items-center gap-2">
+                <Package className="h-4 w-4 text-blue-600" />
+                {proxy.name}
+              </div>
+            </TableCell>
+            <TableCell>
+              <div className="flex items-center gap-2">
+                <Globe className="h-4 w-4 text-green-600" />
+                {proxy.orgId}
+              </div>
+            </TableCell>
+            <TableCell>
+              <Badge variant="outline" className="text-xs">
+                ID: {proxy.id}
+              </Badge>
+            </TableCell>
+            <TableCell>
+              <Badge className="bg-green-100 text-green-800">
+                Active
+              </Badge>
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
 
   return (
     <motion.div
@@ -76,9 +142,12 @@ const ListProxies = () => {
       
       <Card className="overflow-hidden shadow-lg">
         <CardHeader className="bg-white border-b">
-          <CardTitle>Proxy Search</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Package className="h-5 w-5 text-blue-600" />
+            Proxy Search
+          </CardTitle>
           <CardDescription>
-            Search for proxies across your organizations
+            Search for proxies across your Apigee organizations using real API data
           </CardDescription>
         </CardHeader>
         
@@ -86,7 +155,7 @@ const ListProxies = () => {
           <div className="grid gap-6 md:grid-cols-3">
             <div className="space-y-2">
               <label htmlFor="selectedOrg" className="text-sm font-medium">
-                Organization
+                Organization *
               </label>
               <Select value={selectedOrg} onValueChange={setSelectedOrg}>
                 <SelectTrigger id="selectedOrg" className="w-full">
@@ -104,15 +173,21 @@ const ListProxies = () => {
             
             <div className="space-y-2">
               <label htmlFor="token" className="text-sm font-medium">
-                Authorization Token
+                Authorization Token *
               </label>
               <Input
                 id="token"
+                type="password"
                 value={token}
                 onChange={(e) => setToken(e.target.value)}
                 placeholder="Enter authorization token"
                 className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
               />
+              {token && (
+                <Badge variant="secondary" className="text-xs">
+                  ✓ Token provided
+                </Badge>
+              )}
             </div>
             
             <div className="space-y-2">
@@ -124,64 +199,63 @@ const ListProxies = () => {
                   id="search"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search by name, type, or environment"
+                  placeholder="Search by proxy name"
                   className="pr-10 transition-all duration-200 focus:ring-2 focus:ring-primary/20"
                 />
                 <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               </div>
             </div>
           </div>
+
+          {/* Authentication Required Note */}
+          <div className="flex items-start gap-2 p-3 bg-amber-50 rounded-lg border border-amber-200 mt-4">
+            <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+            <div className="text-sm text-amber-800">
+              <strong>Note:</strong> Authentication token is required to fetch real proxy data from Apigee.
+            </div>
+          </div>
           
-          <div className="mt-4">
+          <div className="mt-6">
             <Button 
-              onClick={handleSearch}
-              disabled={isLoading}
-              className="bg-navy hover:bg-navy-200 transition-colors duration-300"
+              onClick={handleFetchProxies}
+              disabled={isLoading || !selectedOrg || !token}
+              className="bg-blue-600 hover:bg-blue-700 transition-colors duration-300"
             >
               {isLoading ? (
                 <>
                   <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                  Searching...
+                  Fetching Proxies...
                 </>
               ) : (
-                'Search Proxies'
+                <>
+                  <Package className="mr-2 h-4 w-4" />
+                  Fetch Proxies
+                </>
               )}
             </Button>
           </div>
-          
-          {proxies.length > 0 && (
+
+          {/* Results Section */}
+          {allProxies.length > 0 && (
             <div className="mt-6">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Environment</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {proxies.map((proxy) => (
-                    <TableRow 
-                      key={proxy.id}
-                      className="hover:bg-gray-50 transition-colors cursor-pointer"
-                    >
-                      <TableCell className="font-medium">{proxy.name}</TableCell>
-                      <TableCell>{proxy.type}</TableCell>
-                      <TableCell>{proxy.environment}</TableCell>
-                      <TableCell>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          proxy.status === 'Active' 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-red-100 text-red-800'
-                        }`}>
-                          {proxy.status}
-                        </span>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <div className="mb-4 text-sm text-gray-600 flex items-center justify-between">
+                <span>
+                  Found {allProxies.length} proxies in {getOrgName(selectedOrg)}
+                  {searchTerm && ` (${filteredProxies.length} matching "${searchTerm}")`}
+                </span>
+                {searchTerm && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSearchTerm("")}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    Clear search
+                  </Button>
+                )}
+              </div>
+              
+              {renderProxyTable(filteredProxies)}
             </div>
           )}
         </CardContent>
