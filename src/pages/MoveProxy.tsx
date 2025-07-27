@@ -19,7 +19,7 @@ import {
 import { 
   getOrganizations, 
   MoveProxy as apiMoveProxy,
-  getOrganizationEnvironments  //     ADD this import
+  getOrganizationEnvironments  
 } from '@/services/api';
 
 const MoveProxy = () => {
@@ -63,7 +63,7 @@ const MoveProxy = () => {
       
       setLoadingEnvironments(true);
       try {
-        // You'll need to add this API call
+        // need to add this API call
         const environments = await getOrganizationEnvironments(targetOrg, formData.targetToken);
         const transformedEnvs = environments.map((env, index) => ({
           id: index + 1,
@@ -131,7 +131,8 @@ const MoveProxy = () => {
     }
     
     setIsLoading(true);
-    
+
+    // sending data to backend using apimoveproxy
     try {
       const payload = {
         sourceOrg,
@@ -144,7 +145,7 @@ const MoveProxy = () => {
         environments: selectedEnvironments
       };
 
-      console.log('🚀 Submitting proxy move request:', payload);
+      console.log('Submitting proxy move request');
 
       const response = await apiMoveProxy(payload);
 

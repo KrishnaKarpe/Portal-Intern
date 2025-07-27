@@ -5,7 +5,7 @@
 const {
   moveProxyService,
   getAllProxiesService,
-  getOrganizationEnvironments  //     ADD this import
+  getOrganizationEnvironments
 } = require('../services/proxyService');
 
 const {
@@ -59,6 +59,7 @@ const moveProxy = async (req, res) => {
       operation: sourceOrg === targetOrg ? 'duplicate' : 'move'
     });
 
+    // Sends all data to moveProxyService
     const result = await moveProxyService({
       sourceOrg,
       targetOrg,

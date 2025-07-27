@@ -279,7 +279,9 @@ const deployProxyToEnvironments = async (orgId, proxyName, revision, environment
     return deploymentResults;
 };
 
-// ==================== BUSINESS LOGIC FUNCTIONS ====================
+
+
+// ==================== (Export + Import + Deploy) ====================
 
 /**
  * Move proxy business logic (Export + Import + Deploy)
@@ -296,20 +298,20 @@ const moveProxyService = async (moveData) => {
         environments = []
     } = moveData;
 
-    console.log('=== AUTOMATED PROXY MOVE/EXPORT/IMPORT ===');
-    console.log('Source Org:', sourceOrg);
-    console.log('Target Org:', targetOrg);
-    console.log('Source Proxy:', proxyName);
-    console.log('Target Proxy:', newProxyName || proxyName);
-    console.log('Revision:', revision);
-    console.log('Target Environments:', environments);
+    // console.log('=== AUTOMATED PROXY MOVE/EXPORT/IMPORT ===');
+    // console.log('Source Org:', sourceOrg);
+    // console.log('Target Org:', targetOrg);
+    // console.log('Source Proxy:', proxyName);
+    // console.log('Target Proxy:', newProxyName || proxyName);
+    // console.log('Revision:', revision);
+    // console.log('Target Environments:', environments);
 
     try {
         // Step 1: Export proxy bundle from source (like manual export)
         console.log('📦 Step 1: Exporting proxy from source organization...');
         const proxyBundle = await fetchProxyFromOrg(sourceOrg, proxyName, sourceToken, revision);
 
-        console.log('    Proxy exported successfully');
+        console.log(' Proxy exported successfully');
         console.log('Export details:', {
             size: `${(proxyBundle.size / 1024).toFixed(2)} KB`,
             revision: proxyBundle.revision,
@@ -325,7 +327,7 @@ const moveProxyService = async (moveData) => {
             targetToken
         );
 
-        console.log('    Proxy imported successfully');
+        console.log('Proxy imported successfully');
 
         // Step 3: Deploy to environments (if specified)
         let deploymentResults = [];
@@ -343,7 +345,7 @@ const moveProxyService = async (moveData) => {
                 targetToken
             );
 
-            console.log('    Deployment completed');
+            console.log('Deployment completed');
         } else {
             console.log('⏭️ Step 3: Skipping deployment (no environments specified)');
         }
@@ -375,6 +377,8 @@ const moveProxyService = async (moveData) => {
         throw error;
     }
 };
+
+// list proxy
 
 /**
  * Get all proxies from organization (similar to getAllProductsService)
@@ -474,7 +478,7 @@ const getAllProxiesService = async (orgId, token) => {
             message: `Found ${transformedProxies.length} proxies`
         };
 
-        console.log('Service returning:', result);
+        // console.log('Service returning:', result);
         return result;
 
     } catch (error) {
@@ -526,5 +530,5 @@ module.exports = {
     fetchProxyFromOrg,
     sendProxyToOrg,
     deployProxyToEnvironments,
-    getOrganizationEnvironments  //     ADD this
+    getOrganizationEnvironments
 };

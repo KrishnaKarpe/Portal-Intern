@@ -9,7 +9,7 @@ import CloneSuccess from "./pages/CloneSuccess";
 import UpdateProduct from "./pages/UpdateProduct";
 import ListProxies from "./pages/ListProxies";
 import ListProducts from "./pages/ListProducts";
-import MoveProxy from "./pages/moveProxy";
+import MoveProxy from "./pages/MoveProxy";
 import NotFound from "./pages/NotFound";
 import CloneproxySuccess from "@/pages/CloneproxySuccess";
 
