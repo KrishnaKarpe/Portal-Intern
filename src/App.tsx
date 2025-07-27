@@ -24,11 +24,11 @@ const App = () => (
         <Routes>
           <Route path="/" element={<MainLayout><Navigate to="/clone-product" replace /></MainLayout>} />
           <Route path="/clone-product" element={<MainLayout><CloneProduct /></MainLayout>} />
+          <Route path="/move-proxy" element={<MainLayout><MoveProxy /></MainLayout>} />
           <Route path="/clone-success" element={<MainLayout><CloneSuccess /></MainLayout>} />
           <Route path="/update-product" element={<MainLayout><UpdateProduct /></MainLayout>} />
           <Route path="/list-proxies" element={<MainLayout><ListProxies /></MainLayout>} />
           <Route path="/list-products" element={<MainLayout><ListProducts /></MainLayout>} />
-          <Route path="/move-proxy" element={<MainLayout><MoveProxy /></MainLayout>} /> {/*     ADD: MoveProxy route */}
           <Route path="/clone-proxy-success" element={<MainLayout><CloneproxySuccess /></MainLayout>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
