@@ -15,11 +15,11 @@ const menuItems = [
   //   path: '/update-product',
   //   icon: <RefreshCw className="h-5 w-5 mr-3" />,
   // },
-  {
-    name: 'Update Product',
-    path: '/update-product',
-    icon: <RefreshCw className="h-5 w-5 mr-3" />,
-  },
+  // {
+  //   name: 'Update Product',
+  //   path: '/update-product',
+  //   icon: <RefreshCw className="h-5 w-5 mr-3" />,
+  // },
     {
     name: 'List All Products',
     path: '/list-products',
