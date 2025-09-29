@@ -22,3 +22,97 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# FastAPI / Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.conda/
+
+# Environment variables
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# API Keys and secrets
+*.key
+*.pem
+secrets/
+.secrets
+
+# FastAPI specific
+fastapi.log
+uvicorn.log
+
+# Documentation and data processing
+processed_docs/
+raw_docs/
+*.pdf
+*.docx
+*.doc
+chroma_db/
+*.db
+*.sqlite
+*.sqlite3
+
+# Compressed files
+*.zip
+*.tar.gz
+*.rar
+*.7z
+*.bz2
+*.xz
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# AI/ML models
+*.model
+*.pkl
+*.pickle
+models/
+embeddings/
+
+# Temporary files
+*.tmp
+*.temp
+.temp/
+temp/
