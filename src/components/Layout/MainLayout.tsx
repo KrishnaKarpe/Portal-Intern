@@ -1,6 +1,6 @@
-
 import React from 'react';
 import Sidebar from './Sidebar';
+import EnhancedChatbot from '@/components/chatbot/EnhancedChatbot';
 import { motion } from 'framer-motion';
 
 interface MainLayoutProps {
@@ -21,6 +21,7 @@ const MainLayout = ({ children }: MainLayoutProps) => {
           {children}
         </div>
       </motion.main>
+      <EnhancedChatbot />
     </div>
   );
 };
