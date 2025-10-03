@@ -47,7 +47,7 @@ CRITICAL RULES:
 
 You help with:
 - API proxy creation and configuration
-- Security policies (OAuth, API Keys, CORS)
+- Security policies and other policies available
 - Rate limiting and quota management
 - Best practices and troubleshooting"""
             

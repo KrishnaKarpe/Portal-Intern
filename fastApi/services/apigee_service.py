@@ -5,7 +5,7 @@ import zipfile
 import io
 from typing import List, Dict, Any
 from common.tools import PolicyTools
-import config  # Make sure this import is correct
+import config  
 
 logger = logging.getLogger(__name__)
 
@@ -162,12 +162,11 @@ To proceed with REAL proxy creation, please confirm by saying: **"Yes, create th
                     "revision": result.get("revision"),
                     "deployment_status": deployment.get("state")
                 },
-                "message": f"✅ REAL proxy '{proxy_name}' created and deployed in Apigee!",
+                "message": f"✅ proxy '{proxy_name}' created and deployed in Apigee!",
                 "test_endpoint": f"https://{organization}-{environment}.apigee.net{base_path}",
                 "next_steps": [
                     f"Proxy available at: https://{organization}-{environment}.apigee.net{base_path}",
                     "Test the endpoint with your API client",
-                    "Monitor usage in Apigee console",
                     "Apply additional configurations as needed"
                 ]
             }
