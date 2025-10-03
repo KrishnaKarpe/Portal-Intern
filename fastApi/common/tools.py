@@ -79,35 +79,60 @@ class PolicyTools:
     @staticmethod
     def extract_target_url(requirements: str) -> str:
         """Extract target URL from requirements"""
-        # Look for URLs in the text
-        url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+'
-        urls = re.findall(url_pattern, requirements)
-        return urls[0] if urls else "https://api.example.com"
+        # Look for URLs in the text - improved pattern
+        url_patterns = [
+            r'pointing to\s+(https?://[^\s,;]+)',  # "pointing to https://..."
+            r'target\s+(?:url\s+)?(?:is\s+)?(https?://[^\s,;]+)',  # "target url is https://..."
+            r'backend\s+(?:url\s+)?(?:is\s+)?(https?://[^\s,;]+)',  # "backend url is https://..."
+            r'(https?://[^\s<>"{}|\\^`\[\],.;]+)'  # General URL pattern
+        ]
+        
+        for pattern in url_patterns:
+            matches = re.findall(pattern, requirements, re.IGNORECASE)
+            if matches:
+                url = matches[0].rstrip('.,;')  # Remove trailing punctuation
+                return url
+        
+        return "https://api.example.com"
     
     @staticmethod
     def extract_base_path(requirements: str) -> str:
         """Extract base path from requirements"""
-        # Look for path patterns like /api/v1, /v1/users, etc.
-        path_pattern = r'/[a-zA-Z0-9/_-]+'
-        paths = re.findall(path_pattern, requirements)
-        # Filter out URLs and get actual paths
-        valid_paths = [p for p in paths if not p.startswith('//')]
-        return valid_paths[0] if valid_paths else "/v1/api"
+        # Look for base path patterns - improved logic
+        base_path_patterns = [
+            r'base path\s+([a-zA-Z0-9\-_/]+)',  # "base path portal-test-js-bot"
+            r'path\s+([a-zA-Z0-9\-_/]+)',       # "path portal-test-js-bot"
+            r'named\s+([a-zA-Z0-9\-_]+)',       # "named portal-test-js-bot" - use as base path
+            r'proxy\s+([a-zA-Z0-9\-_]+)'        # "proxy portal-test-js-bot" - use as base path
+        ]
+        
+        for pattern in base_path_patterns:
+            matches = re.findall(pattern, requirements, re.IGNORECASE)
+            if matches:
+                path = matches[0]
+                # Ensure it starts with /
+                if not path.startswith('/'):
+                    path = f"/{path}"
+                return path
+        
+        return "/v1/api"
     
     @staticmethod
     def extract_proxy_name(text: str) -> str:
-        """Extract proxy name from text"""
-        # Look for patterns like "name: xyz", "called xyz", "proxy xyz"
+        """Extract proxy name from text - improved extraction"""
+        # Look for patterns like "named xyz", "called xyz", "proxy xyz"
         name_patterns = [
-            r'name[:\s]+([a-zA-Z0-9\-_]+)',
-            r'called\s+([a-zA-Z0-9\-_]+)',
-            r'proxy\s+([a-zA-Z0-9\-_]+)'
+            r'named\s+([a-zA-Z0-9\-_]+)',       # "named portal-test-js-bot"
+            r'called\s+([a-zA-Z0-9\-_]+)',      # "called portal-test-js-bot"
+            r'proxy\s+named\s+([a-zA-Z0-9\-_]+)',  # "proxy named portal-test-js-bot"
+            r'create.*?proxy\s+([a-zA-Z0-9\-_]+)',  # "create ... proxy portal-test-js-bot"
+            r'API\s+proxy\s+([a-zA-Z0-9\-_]+)'   # "API proxy portal-test-js-bot"
         ]
         
         for pattern in name_patterns:
-            match = re.search(pattern, text.lower())
-            if match:
-                return match.group(1).replace(' ', '-')
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            if matches:
+                return matches[0].replace(' ', '-')
         
         return "generated-proxy"
     
@@ -118,7 +143,7 @@ class PolicyTools:
             return "No policies configured."
             
         result = "**Policy Execution Flow:**\n"
-        request_policies = [p for p in policies if p in ["VerifyAPIKey", "CORS", "SpikeArrest"]]
+        request_policies = [p for p in policies if p in ["VerifyAPIKey", "CORS", "SpikeArrest", "AssignMessage"]]
         response_policies = [p for p in policies if p in ["JavaScript", "Quota"]]
         
         if request_policies:

@@ -88,23 +88,28 @@ async def chat_with_bot(chat_message: ChatMessage):
                     "requires_confirmation": False
                 }
             
+            # Create context from chat message
+            context = {
+                "organization": chat_message.organization,
+                "token": chat_message.token,
+                **(chat_message.user_context or {})
+            }
+            
             try:
                 response = await asyncio.wait_for(
-                    asyncio.to_thread(agent_mode.run, chat_message.message, chat_message.user_context),
+                    asyncio.to_thread(agent_mode.run, chat_message.message, context),
                     timeout=45.0  # 45 second timeout for agent mode
                 )
             except asyncio.TimeoutError:
-                response = "Agent response timeout. Please try again with a simpler request."
-            
-            if isinstance(response, dict):
-                return response
-            else:
-                return {
-                    "response": response,
+                response = {
+                    "response": "Agent response timeout. Please try again with a simpler request.",
                     "mode": chat_message.mode,
-                    "success": True,
+                    "success": False,
                     "requires_confirmation": False
                 }
+            
+            # Response is already a dict from agent_mode.run()
+            return response
         
     except Exception as e:
         logger.error(f"Chat error: {e}")
@@ -119,16 +124,26 @@ async def chat_with_bot(chat_message: ChatMessage):
 async def confirm_action(confirmation: ConfirmationRequest):
     """Handle confirmations"""
     if not confirmation.user_confirmation:
-        return {"response": "Action cancelled", "success": True}
+        return {
+            "response": "❌ Action cancelled by user",
+            "success": True
+        }
     
     try:
         if confirmation.action == "create_proxy":
             result = await apigee_service.execute_proxy_creation(confirmation.details)
             return result
         else:
-            return {"response": "Unknown action", "success": False}
+            return {
+                "response": f"❌ Unknown action: {confirmation.action}",
+                "success": False
+            }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Confirmation error: {e}")
+        return {
+            "response": f"❌ Error executing action: {str(e)}",
+            "success": False
+        }
 
 @app.get("/health", response_model=HealthResponse)
 async def health_check():

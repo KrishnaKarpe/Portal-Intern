@@ -4,8 +4,9 @@ import requests
 import zipfile
 import tempfile
 import logging
-import re
+import re  # Make sure this import exists
 from typing import Dict, Any, List
+from common.tools import PolicyTools
 
 logger = logging.getLogger(__name__)
 
@@ -60,13 +61,26 @@ class ApigeeService:
     <DisplayName>Verify API Key</DisplayName>
     <APIKey ref="request.queryparam.apikey"/>
 </VerifyAPIKey>''',
-            
+        
             "JavaScript": '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Javascript async="false" continueOnError="false" enabled="true" name="JavaScript">
     <DisplayName>JavaScript</DisplayName>
     <ResourceURL>jsc://javascript-script.js</ResourceURL>
 </Javascript>''',
-            
+        
+            "AssignMessage": '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<AssignMessage async="false" continueOnError="false" enabled="true" name="AssignMessage">
+    <DisplayName>Assign Message</DisplayName>
+    <AssignVariable>
+        <Name>client_ip</Name>
+        <Ref>client.ip</Ref>
+    </AssignVariable>
+    <AssignVariable>
+        <Name>request_timestamp</Name>
+        <Value>{system.timestamp}</Value>
+    </AssignVariable>
+</AssignMessage>''',
+        
             "CORS": '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <CORS async="false" continueOnError="false" enabled="true" name="CORS">
     <DisplayName>CORS</DisplayName>
@@ -77,13 +91,13 @@ class ApigeeService:
     <AllowCredentials>false</AllowCredentials>
     <GeneratePreflightResponse>true</GeneratePreflightResponse>
 </CORS>''',
-            
+        
             "SpikeArrest": '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <SpikeArrest async="false" continueOnError="false" enabled="true" name="SpikeArrest">
     <DisplayName>Spike Arrest</DisplayName>
     <Rate>10ps</Rate>
 </SpikeArrest>''',
-            
+        
             "Quota": '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Quota async="false" continueOnError="false" enabled="true" name="Quota">
     <DisplayName>Quota</DisplayName>
@@ -109,8 +123,8 @@ class ApigeeService:
         postflow_response_steps = []
         
         for policy in policies:
-            if policy in ["CORS", "VerifyAPIKey", "SpikeArrest", "Quota"]:
-                # Security policies go in PreFlow Request
+            if policy in ["CORS", "VerifyAPIKey", "SpikeArrest", "Quota", "AssignMessage"]:
+                # Security and assignment policies go in PreFlow Request
                 preflow_request_steps.append(f'        <Step>\n            <Name>{policy}</Name>\n        </Step>')
             elif policy == "JavaScript":
                 # JavaScript typically in PostFlow Response for transformation
@@ -412,7 +426,9 @@ To proceed with creation, please confirm by responding with:
     
     def generate_proxy_config(self, requirements: str) -> str:
         """Generate proxy configuration XML based on requirements"""
-        # Extract basic info
+        # Extract basic info from requirements
+        import re
+        
         name = "sample-proxy"
         target_url = "https://api.example.com"
         base_path = "/v1/sample"
@@ -420,31 +436,31 @@ To proceed with creation, please confirm by responding with:
         
         # Try to extract information from requirements
         if requirements:
-            name_match = re.search(r'proxy\s+name[:\s]+([a-zA-Z0-9\-_]+)', requirements.lower())
+            name_match = re.search(r'named\s+([a-zA-Z0-9\-_]+)', requirements.lower())
             if name_match:
                 name = name_match.group(1)
             
-            url_match = re.search(r'target\s+url[:\s]+(https?://[^\s]+)', requirements.lower())
+            url_match = re.search(r'pointing to\s+(https?://[^\s]+)', requirements.lower())
             if url_match:
                 target_url = url_match.group(1)
             
-            path_match = re.search(r'base\s+path[:\s]+(/[^\s]+)', requirements.lower())
+            path_match = re.search(r'base path\s+([a-zA-Z0-9\-_/]+)', requirements.lower())
             if path_match:
-                base_path = path_match.group(1)
+                base_path = f"/{path_match.group(1).strip('/')}"
             
             # Add policy detection
+            if "javascript" in requirements.lower():
+                policies.append("JavaScript")
+            
+            if "assign message" in requirements.lower() or "assignmessage" in requirements.lower():
+                policies.append("AssignMessage")
+            
             if "security" in requirements.lower() or "apikey" in requirements.lower():
                 policies.append("VerifyAPIKey")
             
-            if "cors" in requirements.lower() or "cross" in requirements.lower():
+            if "cors" in requirements.lower():
                 policies.append("CORS")
-            
-            if "quota" in requirements.lower() or "rate limit" in requirements.lower():
-                policies.append("Quota")
-            
-            if "javascript" in requirements.lower() or "js" in requirements.lower():
-                policies.append("JavaScript")
-        
+    
         # Generate basic proxy XML
         proxy_xml = self._generate_proxy_xml(name, f"Auto-generated proxy for {name}", policies)
         endpoint_xml = self._generate_proxy_endpoint_xml(name, base_path, policies)
@@ -469,7 +485,65 @@ To proceed with creation, please confirm by responding with:
 {target_xml}
 ```
 
-**Note:** This is a sample configuration based on extracted requirements. Please review and adjust policies and settings as necessary.
+**Policies Configured**: {', '.join(policies) if policies else 'None'}
 """
-        
+    
         return response.strip()
+    
+    def _extract_proxy_name_from_requirements(self, requirements: str) -> str:
+        """Extract proxy name from requirements text"""
+        # Look for patterns like "named xyz", "called xyz", "proxy xyz"
+        name_patterns = [
+            r'named\s+([a-zA-Z0-9\-_]+)',       # "named portal-test-js-bot"
+            r'called\s+([a-zA-Z0-9\-_]+)',      # "called portal-test-js-bot"
+            r'proxy\s+named\s+([a-zA-Z0-9\-_]+)',  # "proxy named portal-test-js-bot"
+            r'create.*?proxy\s+([a-zA-Z0-9\-_]+)',  # "create ... proxy portal-test-js-bot"
+            r'API\s+proxy\s+([a-zA-Z0-9\-_]+)'   # "API proxy portal-test-js-bot"
+        ]
+        
+        for pattern in name_patterns:
+            matches = re.findall(pattern, requirements, re.IGNORECASE)
+            if matches:
+                return matches[0].replace(' ', '-')
+        
+        return "generated-proxy"
+    
+    def _extract_target_url_from_requirements(self, requirements: str) -> str:
+        """Extract target URL from requirements"""
+        # Look for URLs in the text - improved pattern
+        url_patterns = [
+            r'pointing to\s+(https?://[^\s,;]+)',  # "pointing to https://..."
+            r'target\s+(?:url\s+)?(?:is\s+)?(https?://[^\s,;]+)',  # "target url is https://..."
+            r'backend\s+(?:url\s+)?(?:is\s+)?(https?://[^\s,;]+)',  # "backend url is https://..."
+            r'(https?://[^\s<>"{}|\\^`\[\],.;]+)'  # General URL pattern
+        ]
+        
+        for pattern in url_patterns:
+            matches = re.findall(pattern, requirements, re.IGNORECASE)
+            if matches:
+                url = matches[0].rstrip('.,;')  # Remove trailing punctuation
+                return url
+        
+        return "https://api.example.com"
+    
+    def _extract_base_path_from_requirements(self, requirements: str, proxy_name: str) -> str:
+        """Extract base path from requirements"""
+        # Look for base path patterns - improved logic
+        base_path_patterns = [
+            r'base path\s+([a-zA-Z0-9\-_/]+)',  # "base path portal-test-js-bot"
+            r'path\s+([a-zA-Z0-9\-_/]+)',       # "path portal-test-js-bot"
+        ]
+        
+        for pattern in base_path_patterns:
+            matches = re.findall(pattern, requirements, re.IGNORECASE)
+            if matches:
+                path = matches[0]
+                # Ensure it starts with /
+                if not path.startswith('/'):
+                    path = f"/{path}"
+                return path
+        
+        # If no explicit base path found, use proxy name
+        if not proxy_name.startswith('/'):
+            return f"/{proxy_name}"
+        return proxy_name
