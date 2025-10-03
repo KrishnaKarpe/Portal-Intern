@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # Import our modules
 import config
-from models import ChatMessage, ChatResponse, ConfirmationRequest, HealthResponse, ChatMode
+from models import ChatMessage, ConfirmationRequest, HealthResponse, ChatMode
 from services.llm import LLMService
 from services.knowledge_base import KnowledgeService
 from services.apigee_service import ApigeeService
@@ -36,44 +36,66 @@ apigee_service = ApigeeService()
 ask_agent = AskAgent(llm_service, knowledge_service, apigee_service)
 agent_mode = AgentMode(llm_service, knowledge_service, apigee_service)
 
-@app.post("/chat", response_model=ChatResponse)
+@app.post("/chat")  # Removed response_model to allow dynamic fields
 async def chat_with_bot(chat_message: ChatMessage):
     """Main chat endpoint"""
     
     if not config.GROQ_API_KEY:
-        return ChatResponse(
-            response="⚠️ **Setup Required**: Set GROQ_API_KEY environment variable\n\n🆓 Get key: https://console.groq.com/",
-            mode=chat_message.mode,
-            success=True,
-            requires_confirmation=False
-        )
+        return {
+            "response": "⚠️ **Setup Required**: Set GROQ_API_KEY environment variable\n\n🆓 Get key: https://console.groq.com/",
+            "mode": chat_message.mode,
+            "success": True,
+            "requires_confirmation": False
+        }
     
     try:
+        logger.info(f"Chat request: {chat_message.message[:100]}...")
+        
         # Route to appropriate agent
         if chat_message.mode == ChatMode.ASK:
             if not ask_agent.is_ready():
                 raise Exception("Ask agent not ready")
             response = ask_agent.run(chat_message.message)
+            return {
+                "response": response,
+                "mode": chat_message.mode,
+                "success": True,
+                "requires_confirmation": False
+            }
         else:
             if not agent_mode.is_ready():
                 raise Exception("Agent mode not ready")
-            response = agent_mode.run(chat_message.message)
-        
-        return ChatResponse(
-            response=response,
-            mode=chat_message.mode,
-            success=True,
-            requires_confirmation="confirm" in response.lower()
-        )
+            
+            # Pass context to agent for structured responses
+            context = {
+                "organization": chat_message.organization,
+                "token": chat_message.token,
+                "user_context": chat_message.user_context
+            }
+            
+            # Check if it's a proxy creation request
+            if "create" in chat_message.message.lower() and ("proxy" in chat_message.message.lower() or "api" in chat_message.message.lower()):
+                # Use structured response method - directly return the dictionary from agent_mode
+                result = agent_mode.handle_agent_request(chat_message.message, context)
+                return result  # This should include the action field
+            else:
+                # Use regular agent flow
+                response = agent_mode.run(chat_message.message, context)
+                return {
+                    "response": response,
+                    "mode": chat_message.mode,
+                    "success": True,
+                    "requires_confirmation": "confirm" in response.lower()
+                }
         
     except Exception as e:
         logger.error(f"Chat error: {e}")
-        return ChatResponse(
-            response=f"Error: {e}",
-            mode=chat_message.mode,
-            success=False,
-            requires_confirmation=False
-        )
+        return {
+            "response": f"Error: {e}",
+            "mode": chat_message.mode,
+            "success": False,
+            "requires_confirmation": False
+        }
 
 @app.post("/confirm-action")
 async def confirm_action(confirmation: ConfirmationRequest):

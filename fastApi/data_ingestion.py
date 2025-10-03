@@ -9,9 +9,191 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain.schema import Document
 from urllib.parse import urljoin, urlparse
 import time
+from datetime import datetime
+from typing import Dict, Any, List
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+class PolicyDataIngestion:
+    """Enhanced policy documentation ingestion from real Apigee docs"""
+    
+    def __init__(self):
+        self.policy_docs_path = "./processed_docs/policy_docs.json"
+        # Real Apigee policy documentation URLs
+        self.apigee_policy_urls = [
+            "https://cloud.google.com/apigee/docs/api-platform/reference/policies/verify-api-key-policy",
+            "https://cloud.google.com/apigee/docs/api-platform/reference/policies/oauth-v20-policy", 
+            "https://cloud.google.com/apigee/docs/api-platform/reference/policies/javascript-policy",
+            "https://cloud.google.com/apigee/docs/api-platform/reference/policies/service-callout-policy",
+            "https://cloud.google.com/apigee/docs/api-platform/reference/policies/cors-policy",
+            "https://cloud.google.com/apigee/docs/api-platform/reference/policies/spike-arrest-policy",
+            "https://cloud.google.com/apigee/docs/api-platform/reference/policies/quota-policy",
+            "https://cloud.google.com/apigee/docs/api-platform/reference/policies/assign-message-policy",
+            "https://cloud.google.com/apigee/docs/api-platform/reference/policies/extract-variables-policy",
+            "https://cloud.google.com/apigee/docs/api-platform/reference/policies/raise-fault-policy",
+            "https://cloud.google.com/apigee/docs/api-platform/reference/policies/json-to-xml-policy",
+            "https://cloud.google.com/apigee/docs/api-platform/reference/policies/xml-to-json-policy",
+            "https://cloud.google.com/apigee/docs/api-platform/reference/policies/json-threat-protection-policy",
+            "https://cloud.google.com/apigee/docs/api-platform/reference/policies/regular-expression-protection",
+            "https://cloud.google.com/apigee/docs/api-platform/reference/policies/response-cache-policy"
+        ]
+    
+    def scrape_policy_documentation(self) -> List[Document]:
+        """Scrape real policy documentation from Apigee docs"""
+        logger.info("🔧 Scraping real Apigee policy documentation...")
+        
+        policy_documents = []
+        
+        for i, url in enumerate(self.apigee_policy_urls):
+            try:
+                logger.info(f"Scraping policy {i+1}/{len(self.apigee_policy_urls)}: {url}")
+                
+                # Add delay to be respectful
+                if i > 0:
+                    time.sleep(2)
+                
+                # Load the policy page
+                loader = WebBaseLoader([url])
+                docs = loader.load()
+                
+                for doc in docs:
+                    if doc.page_content and len(doc.page_content.strip()) > 100:
+                        # Extract policy name from URL
+                        policy_name = self._extract_policy_name_from_url(url)
+                        
+                        doc.metadata.update({
+                            'source': url,
+                            'category': 'policy_reference',
+                            'type': 'policy_doc',
+                            'title': f'{policy_name} Policy Reference',
+                            'policy_name': policy_name,
+                            'scraped_from': 'apigee_docs'
+                        })
+                        policy_documents.append(doc)
+                        logger.info(f"Added policy doc: {policy_name}")
+                
+            except Exception as e:
+                logger.error(f"Error scraping policy {url}: {str(e)}")
+                continue
+        
+        logger.info(f"✅ Scraped {len(policy_documents)} policy documents from real Apigee docs")
+        return policy_documents
+    
+    def _extract_policy_name_from_url(self, url: str) -> str:
+        """Extract policy name from Apigee documentation URL"""
+        try:
+            # Extract from URL pattern like: .../policies/verify-api-key-policy
+            path_parts = url.split('/')
+            policy_slug = path_parts[-1]  # e.g., "verify-api-key-policy"
+            
+            # Convert to policy name
+            name_mapping = {
+                "verify-api-key-policy": "VerifyAPIKey",
+                "oauth-v20-policy": "OAuthV2", 
+                "javascript-policy": "JavaScript",
+                "service-callout-policy": "ServiceCallout",
+                "cors-policy": "CORS",
+                "spike-arrest-policy": "SpikeArrest",
+                "quota-policy": "Quota",
+                "assign-message-policy": "AssignMessage",
+                "extract-variables-policy": "ExtractVariables",
+                "raise-fault-policy": "RaiseFault",
+                "json-to-xml-policy": "JSONToXML",
+                "xml-to-json-policy": "XMLToJSON",
+                "json-threat-protection-policy": "JSONThreatProtection",
+                "regular-expression-protection": "RegularExpressionProtection",
+                "response-cache-policy": "ResponseCache"
+            }
+            
+            return name_mapping.get(policy_slug, policy_slug.replace('-', '').title())
+            
+        except:
+            return "UnknownPolicy"
+    
+    def create_minimal_policy_catalog(self) -> Dict[str, Any]:
+        """Create minimal policy catalog with just essentials"""
+        
+        # Minimal policy info for keyword matching - no long XML templates
+        minimal_policies = {
+            "VerifyAPIKey": {
+                "category": "security",
+                "keywords": ["api key", "apikey", "key auth", "verify key", "authentication"]
+            },
+            "OAuthV2": {
+                "category": "security", 
+                "keywords": ["oauth", "oauth2", "access token", "bearer token", "authorization"]
+            },
+            "JavaScript": {
+                "category": "logic",
+                "keywords": ["javascript", "js", "custom logic", "script", "code execution"]
+            },
+            "ServiceCallout": {
+                "category": "external",
+                "keywords": ["service callout", "http callout", "external api", "backend call"]
+            },
+            "CORS": {
+                "category": "headers",
+                "keywords": ["cors", "cross origin", "browser", "frontend", "web app"]
+            },
+            "SpikeArrest": {
+                "category": "traffic",
+                "keywords": ["spike", "traffic spike", "ddos", "burst protection"]
+            },
+            "Quota": {
+                "category": "traffic",
+                "keywords": ["rate limit", "throttle", "quota", "usage limit"]
+            },
+            "AssignMessage": {
+                "category": "headers",
+                "keywords": ["add header", "set header", "modify request", "assign message"]
+            },
+            "ExtractVariables": {
+                "category": "headers",
+                "keywords": ["extract", "parse", "get value", "json path", "xpath"]
+            },
+            "RaiseFault": {
+                "category": "error_handling",
+                "keywords": ["error", "fault", "raise error", "custom error", "exception"]
+            },
+            "JSONToXML": {
+                "category": "transformation",
+                "keywords": ["json to xml", "xml transform", "convert json", "transformation"]
+            },
+            "XMLToJSON": {
+                "category": "transformation",
+                "keywords": ["xml to json", "json transform", "convert xml"]
+            },
+            "JSONThreatProtection": {
+                "category": "validation",
+                "keywords": ["validate json", "json validation", "json threat", "security"]
+            },
+            "RegularExpressionProtection": {
+                "category": "validation",
+                "keywords": ["regex", "regular expression", "pattern validation", "input validation"]
+            },
+            "ResponseCache": {
+                "category": "caching",
+                "keywords": ["cache", "caching", "response cache", "performance"]
+            }
+        }
+        
+        policy_catalog = {
+            "metadata": {
+                "created_at": datetime.now().isoformat(),
+                "source": "minimal_catalog_with_scraped_docs",
+                "total_policies": len(minimal_policies)
+            },
+            "policies": minimal_policies
+        }
+        
+        # Save minimal catalog
+        os.makedirs(os.path.dirname(self.policy_docs_path), exist_ok=True)
+        with open(self.policy_docs_path, 'w', encoding='utf-8') as f:
+            json.dump(policy_catalog, f, indent=2, ensure_ascii=False)
+        
+        logger.info(f"✅ Created minimal policy catalog with {len(minimal_policies)} policies")
+        return policy_catalog
 
 class ApigeeDocsIngestion:
     def __init__(self):
@@ -248,8 +430,8 @@ class ApigeeDocsIngestion:
         return index
     
     def run_full_ingestion(self):
-        """Run the complete ingestion process"""
-        logger.info("=== Starting Full Documentation Ingestion ===")
+        """Run the complete ingestion process including policies"""
+        logger.info("=== Starting Full Documentation Ingestion (with Real Policy Docs) ===")
         
         # Load all documents
         all_documents = []
@@ -258,30 +440,37 @@ class ApigeeDocsIngestion:
         web_docs = self.scrape_apigee_docs()
         all_documents.extend(web_docs)
         
-        # 2. Load PDF documents
+        # 2. Load PDF documents  
         pdf_docs = self.load_pdf_docs()
         all_documents.extend(pdf_docs)
         
+        # 3. **NEW: Scrape real policy documentation**
+        policy_ingestion = PolicyDataIngestion()
+        policy_docs = policy_ingestion.scrape_policy_documentation()
+        all_documents.extend(policy_docs)  # Add scraped policy docs
+        
+        # 4. Create minimal policy catalog for keyword matching
+        policy_ingestion.create_minimal_policy_catalog()
+        
         if not all_documents:
             logger.error("No documents were loaded!")
-            # Create minimal fallback documentation
             self._create_fallback_docs()
             return self._load_fallback_docs()
         
-        # 3. Process documents
+        # 5. Process documents
         processed_texts = self.process_documents(all_documents)
         
         if not processed_texts:
             logger.error("No texts were processed!")
             return self._load_fallback_docs()
         
-        # 4. Save processed documents
+        # 6. Save processed documents
         self.save_processed_docs(processed_texts)
         
-        # 5. Create index
+        # 7. Create index
         index = self.create_documentation_index(processed_texts)
         
-        logger.info("=== Ingestion Complete ===")
+        logger.info("=== Ingestion Complete (with Real Policy Documentation) ===")
         return processed_texts, index
     
     def _create_fallback_docs(self):

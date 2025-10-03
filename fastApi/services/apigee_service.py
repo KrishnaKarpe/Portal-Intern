@@ -1,258 +1,59 @@
-import requests
-import logging
+import os
 import json
+import requests
 import zipfile
-import io
-from typing import List, Dict, Any
-from common.tools import PolicyTools
-import config  
+import tempfile
+import logging
+from typing import Dict, Any, List
+import re
 
 logger = logging.getLogger(__name__)
 
 class ApigeeService:
     """Handles Apigee-specific operations"""
     
-    def analyze_requirements(self, requirements: str, doc_context: str = "") -> str:
-        """Analyze requirements and suggest configuration"""
-        target_url = PolicyTools.extract_target_url(requirements)
-        base_path = PolicyTools.extract_base_path(requirements)
-        policies = PolicyTools.suggest_policies(requirements)
-        
-        return f"""
-🔍 **Requirement Analysis:**
-
-**Recommended Configuration:**
-- Target Endpoint: `{target_url}`
-- Base Path: `{base_path}`  
-- Policies: {', '.join(policies) if policies else 'None (basic proxy only)'}
-
-**Policy Details:**
-{PolicyTools.explain_policies(policies) if policies else 'No additional policies - creating basic passthrough proxy'}
-
-**Documentation Context:**
-{doc_context}
-
-💡 **Next Steps:**
-1. Review configuration
-2. Modify as needed
-3. Use Agent mode to create proxy
-"""
+    def __init__(self):
+        self.base_url = "https://apigee.googleapis.com/v1"
+        self.org = os.getenv('APIGEE_ORG', 'apigee-non-prod-crjb')
+        self.environment = os.getenv('APIGEE_ENVIRONMENT', 'apim-dev')
     
-    def generate_proxy_config(self, requirements: str) -> str:
-        """Generate complete proxy XML configuration"""
-        target_url = PolicyTools.extract_target_url(requirements)
-        base_path = PolicyTools.extract_base_path(requirements)
-        policies = PolicyTools.suggest_policies(requirements)
-        
-        # Extract proxy name from requirements or base path
-        proxy_name = PolicyTools.extract_proxy_name(requirements)
-        
-        return f"""
-🔧 **Complete Proxy Configuration:**
-
-**Proxy Name:** `{proxy_name}`
-
-**Proxy Endpoint:**
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<ProxyEndpoint name="default">
-    <Description>Generated proxy for {requirements[:50]}...</Description>
-    <HTTPProxyConnection>
-        <BasePath>{base_path}</BasePath>
-        <VirtualHost>default</VirtualHost>
-        <VirtualHost>secure</VirtualHost>
-    </HTTPProxyConnection>
-    <Flows>
-        <Flow name="MainFlow">
-            <Request>
-{PolicyTools.generate_policy_steps(policies) if policies else '                <!-- No policies requested -->'}
-            </Request>
-            <Response>
-                <!-- Response flow policies if needed -->
-            </Response>
-        </Flow>
-    </Flows>
-    <RouteRule name="default">
-        <TargetEndpoint>default</TargetEndpoint>
-    </RouteRule>
-</ProxyEndpoint>
-```
-
-**Target Endpoint:**
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<TargetEndpoint name="default">
-    <Description>Target for {target_url}</Description>
-    <HTTPTargetConnection>
-        <URL>{target_url}</URL>
-    </HTTPTargetConnection>
-</TargetEndpoint>
-```
-
-**Policy Files:**
-{PolicyTools.generate_policy_xml(policies) if policies else '<!-- No additional policies requested -->'}
-"""
+    def _get_access_token(self) -> str:
+        """Get access token"""
+        token = os.getenv('APIGEE_TOKEN')
+        if not token:
+            raise Exception("APIGEE_TOKEN not found in environment variables")
+        return token
     
-    def create_api_proxy(self, config_text: str) -> str:
-        """Prepare proxy creation (requires confirmation)"""
-        return f"""
-🤖 **REAL Apigee Proxy Creation Ready**
-
-Configuration generated:
-{config_text[:400]}...
-
-**Actions I'll perform in your Apigee organization:**
-1. ✅ Create proxy bundle with XML configurations
-2. ✅ Apply ONLY the policies you requested (no extras)
-3. ✅ Deploy to {config.APIGEE_ENVIRONMENT} environment
-4. ✅ Verify deployment and provide test endpoint
-
-⚠️ **REAL APIGEE CONFIRMATION REQUIRED**
-This will create an ACTUAL proxy in your Apigee organization.
-
-To proceed with REAL proxy creation, please confirm by saying: **"Yes, create the proxy"**
-
-**Organization:** {config.APIGEE_ORG or 'Not configured'}
-**Environment:** {config.APIGEE_ENVIRONMENT}
-"""
-    
-    async def execute_proxy_creation(self, details: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute REAL proxy creation in Apigee"""
-        
-        if config.DEVELOPMENT_MODE:
-            return await self._mock_proxy_creation(details)
-        
-        # REAL APIGEE CREATION
-        logger.info("🚀 REAL APIGEE: Creating actual proxy")
-        
-        proxy_name = details.get("name", "ai-generated-proxy")
-        target_url = details.get("target_url")
-        base_path = details.get("base_path", "/v1/api")
-        policies = details.get("policies", [])
-        
-        # Use org and token from config or details
-        organization = details.get("organization") or config.APIGEE_ORG
-        token = details.get("token") or config.APIGEE_TOKEN
-        environment = details.get("environment") or config.APIGEE_ENVIRONMENT
-        
-        if not organization or not token:
-            raise Exception("Apigee organization and token required. Set APIGEE_ORG and APIGEE_TOKEN in .env file")
-        
+    def _make_request(self, method: str, url: str, data=None, files=None) -> Dict[str, Any]:
+        """Make authenticated request to Apigee API"""
         try:
-            # Step 1: Create proxy bundle
-            proxy_bundle = self._create_proxy_bundle(proxy_name, target_url, base_path, policies)
-            
-            # Step 2: Import to Apigee
-            result = await self._import_proxy_to_apigee(organization, token, proxy_name, proxy_bundle)
-            
-            # Step 3: Deploy to environment
-            deployment = await self._deploy_proxy(organization, token, proxy_name, environment)
-            
-            return {
-                "status": "success",
-                "mode": "real_apigee",
-                "proxy_details": {
-                    "name": proxy_name,
-                    "target_url": target_url,
-                    "base_path": base_path,
-                    "policies_applied": policies,
-                    "organization": organization,
-                    "environment": environment,
-                    "created_at": result.get("createdAt"),
-                    "revision": result.get("revision"),
-                    "deployment_status": deployment.get("state")
-                },
-                "message": f"✅ proxy '{proxy_name}' created and deployed in Apigee!",
-                "test_endpoint": f"https://{organization}-{environment}.apigee.net{base_path}",
-                "next_steps": [
-                    f"Proxy available at: https://{organization}-{environment}.apigee.net{base_path}",
-                    "Test the endpoint with your API client",
-                    "Apply additional configurations as needed"
-                ]
+            token = self._get_access_token()
+            headers = {
+                'Authorization': f'Bearer {token}'
             }
             
+            if files:
+                # Let requests set the Content-Type for file uploads
+                response = requests.request(method, url, headers=headers, files=files)
+            else:
+                headers['Content-Type'] = 'application/json'
+                response = requests.request(method, url, headers=headers, json=data)
+            
+            logger.info(f"Apigee API {method} {url}: {response.status_code}")
+            
+            if response.status_code >= 400:
+                raise Exception(f"API error {response.status_code}: {response.text}")
+            
+            return response.json() if response.content else {}
+            
         except Exception as e:
-            logger.error(f"Real Apigee proxy creation failed: {e}")
-            raise Exception(f"Failed to create proxy in Apigee: {str(e)}")
+            logger.error(f"Apigee API request failed: {str(e)}")
+            raise e
     
-    def _create_proxy_bundle(self, name: str, target_url: str, base_path: str, policies: List[str]) -> bytes:
-        """Create Apigee proxy bundle ZIP file"""
+    def _generate_policy_xml(self, policy_name: str, custom_logic: Dict[str, Any] = None) -> str:
+        """Generate policy XML"""
         
-        # Proxy Endpoint XML
-        proxy_endpoint = f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<ProxyEndpoint name="default">
-    <Description>AI Generated Proxy</Description>
-    <HTTPProxyConnection>
-        <BasePath>{base_path}</BasePath>
-        <VirtualHost>default</VirtualHost>
-        <VirtualHost>secure</VirtualHost>
-    </HTTPProxyConnection>
-    <Flows>
-        <Flow name="MainFlow">
-            <Request>
-{PolicyTools.generate_policy_steps(policies) if policies else ''}
-            </Request>
-        </Flow>
-    </Flows>
-    <RouteRule name="default">
-        <TargetEndpoint>default</TargetEndpoint>
-    </RouteRule>
-</ProxyEndpoint>'''
-
-        # Target Endpoint XML
-        target_endpoint = f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<TargetEndpoint name="default">
-    <Description>Target for {target_url}</Description>
-    <HTTPTargetConnection>
-        <URL>{target_url}</URL>
-    </HTTPTargetConnection>
-</TargetEndpoint>'''
-
-        # Main Proxy XML
-        main_proxy = f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<APIProxy revision="1" name="{name}">
-    <Description>AI Generated Proxy</Description>
-    <DisplayName>{name}</DisplayName>
-    <Policies>
-{self._generate_policy_references(policies)}
-    </Policies>
-    <ProxyEndpoints>
-        <ProxyEndpoint>default</ProxyEndpoint>
-    </ProxyEndpoints>
-    <TargetEndpoints>
-        <TargetEndpoint>default</TargetEndpoint>
-    </TargetEndpoints>
-</APIProxy>'''
-
-        # Create ZIP bundle
-        zip_buffer = io.BytesIO()
-        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-            # Add main proxy file
-            zip_file.writestr(f"apiproxy/{name}.xml", main_proxy)
-            
-            # Add proxy endpoint
-            zip_file.writestr("apiproxy/proxies/default.xml", proxy_endpoint)
-            
-            # Add target endpoint
-            zip_file.writestr("apiproxy/targets/default.xml", target_endpoint)
-            
-            # Add policy files
-            for policy in policies:
-                policy_xml = self._get_policy_xml(policy)
-                zip_file.writestr(f"apiproxy/policies/{policy}.xml", policy_xml)
-        
-        zip_buffer.seek(0)
-        return zip_buffer.read()
-    
-    def _generate_policy_references(self, policies: List[str]) -> str:
-        """Generate policy references for main proxy XML"""
-        refs = ""
-        for policy in policies:
-            refs += f"        <Policy>{policy}</Policy>\n"
-        return refs.rstrip()
-    
-    def _get_policy_xml(self, policy_name: str) -> str:
-        """Get actual policy XML content"""
+        # Default policy templates
         policy_templates = {
             "VerifyAPIKey": '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <VerifyAPIKey async="false" continueOnError="false" enabled="true" name="VerifyAPIKey">
@@ -260,89 +61,299 @@ To proceed with REAL proxy creation, please confirm by saying: **"Yes, create th
     <APIKey ref="request.queryparam.apikey"/>
 </VerifyAPIKey>''',
             
+            "JavaScript": '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Javascript async="false" continueOnError="false" enabled="true" name="JavaScript">
+    <DisplayName>JavaScript</DisplayName>
+    <ResourceURL>jsc://javascript-script.js</ResourceURL>
+</Javascript>''',
+            
             "CORS": '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <CORS async="false" continueOnError="false" enabled="true" name="CORS">
-    <DisplayName>CORS Policy</DisplayName>
+    <DisplayName>CORS</DisplayName>
     <AllowOrigins>*</AllowOrigins>
     <AllowMethods>GET,POST,PUT,DELETE,OPTIONS</AllowMethods>
-    <AllowHeaders>Content-Type,Authorization</AllowHeaders>
+    <AllowHeaders>Content-Type,Authorization,X-Requested-With</AllowHeaders>
     <MaxAge>3628800</MaxAge>
+    <AllowCredentials>false</AllowCredentials>
+    <GeneratePreflightResponse>true</GeneratePreflightResponse>
 </CORS>''',
-            
-            "Quota": '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Quota async="false" continueOnError="false" enabled="true" name="Quota">
-    <DisplayName>Quota Policy</DisplayName>
-    <Allow count="100"/>
-    <Interval>1</Interval>
-    <TimeUnit>minute</TimeUnit>
-    <Identifier ref="request.queryparam.apikey"/>
-</Quota>''',
             
             "SpikeArrest": '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <SpikeArrest async="false" continueOnError="false" enabled="true" name="SpikeArrest">
     <DisplayName>Spike Arrest</DisplayName>
     <Rate>10ps</Rate>
-</SpikeArrest>'''
+</SpikeArrest>''',
+            
+            "Quota": '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Quota async="false" continueOnError="false" enabled="true" name="Quota">
+    <DisplayName>Quota</DisplayName>
+    <Allow count="100"/>
+    <Interval>1</Interval>
+    <TimeUnit>minute</TimeUnit>
+</Quota>'''
         }
         
-        return policy_templates.get(policy_name, f'<!-- Policy {policy_name} not found -->')
+        # Return the template or a generic one if not found
+        return policy_templates.get(policy_name, f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<{policy_name} async="false" continueOnError="false" enabled="true" name="{policy_name}">
+    <DisplayName>{policy_name}</DisplayName>
+</{policy_name}>''')
     
-    async def _import_proxy_to_apigee(self, org: str, token: str, name: str, bundle: bytes) -> Dict[str, Any]:
-        """Import proxy bundle to Apigee"""
+    def _generate_proxy_endpoint_xml(self, name: str, base_path: str, policies: List[str]) -> str:
+        """Generate proxy endpoint XML with proper policy references"""
         
-        url = f"{config.APIGEE_BASE_URL}/organizations/{org}/apis?action=import&name={name}"
+        # Build policy steps
+        preflow_request_steps = []
+        preflow_response_steps = []
+        postflow_request_steps = []
+        postflow_response_steps = []
         
-        headers = {
-            "Authorization": f"Bearer {token}",
-        }
+        for policy in policies:
+            if policy in ["CORS", "VerifyAPIKey", "SpikeArrest", "Quota"]:
+                # Security policies go in PreFlow Request
+                preflow_request_steps.append(f'        <Step>\n            <Name>{policy}</Name>\n        </Step>')
+            elif policy == "JavaScript":
+                # JavaScript typically in PostFlow Response for transformation
+                postflow_response_steps.append(f'        <Step>\n            <Name>{policy}</Name>\n        </Step>')
+            else:
+                # Others, default to PreFlow Response
+                preflow_response_steps.append(f'        <Step>\n            <Name>{policy}</Name>\n        </Step>')
         
-        files = {
-            'file': ('proxy.zip', bundle, 'application/zip')
-        }
+        preflow_request_xml = "\n".join(preflow_request_steps) if preflow_request_steps else ""
+        preflow_response_xml = "\n".join(preflow_response_steps) if preflow_response_steps else ""
+        postflow_request_xml = "\n".join(postflow_request_steps) if postflow_request_steps else ""
+        postflow_response_xml = "\n".join(postflow_response_steps) if postflow_response_steps else ""
         
-        response = requests.post(url, headers=headers, files=files, timeout=60)
-        
-        if response.status_code in [200, 201]:
-            logger.info(f"✅ Proxy {name} imported successfully")
-            return response.json()
-        else:
-            raise Exception(f"Import failed: {response.status_code} - {response.text}")
+        return f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<ProxyEndpoint name="default">
+    <Description>{name} proxy endpoint</Description>
+    <PreFlow name="PreFlow">
+        <Request>
+{preflow_request_xml}
+        </Request>
+        <Response>
+{preflow_response_xml}
+        </Response>
+    </PreFlow>
+    <PostFlow name="PostFlow">
+        <Request>
+{postflow_request_xml}
+        </Request>
+        <Response>
+{postflow_response_xml}
+        </Response>
+    </PostFlow>
+    <Flows/>
+    <HTTPProxyConnection>
+        <BasePath>{base_path}</BasePath>
+        <VirtualHost>default</VirtualHost>
+    </HTTPProxyConnection>
+    <RouteRule name="default">
+        <TargetEndpoint>default</TargetEndpoint>
+    </RouteRule>
+</ProxyEndpoint>'''
     
-    async def _deploy_proxy(self, org: str, token: str, name: str, environment: str) -> Dict[str, Any]:
-        """Deploy proxy to environment"""
-        
-        # Get latest revision first
-        revisions_url = f"{config.APIGEE_BASE_URL}/organizations/{org}/apis/{name}/revisions"
-        headers = {"Authorization": f"Bearer {token}"}
-        
-        revisions_response = requests.get(revisions_url, headers=headers)
-        if revisions_response.status_code != 200:
-            raise Exception(f"Failed to get revisions: {revisions_response.text}")
-        
-        revisions = revisions_response.json()
-        latest_revision = max(revisions) if revisions else "1"
-        
-        # Deploy the proxy
-        deploy_url = f"{config.APIGEE_BASE_URL}/organizations/{org}/environments/{environment}/apis/{name}/revisions/{latest_revision}/deployments"
-        
-        response = requests.post(deploy_url, headers=headers, timeout=60)
-        
-        if response.status_code in [200, 201]:
-            logger.info(f"✅ Proxy {name} deployed to {environment}")
-            return response.json()
-        else:
-            raise Exception(f"Deployment failed: {response.status_code} - {response.text}")
+    def _generate_target_endpoint_xml(self, target_url: str) -> str:
+        """Generate target endpoint XML"""
+        # Remove any trailing periods in URLs
+        if target_url.endswith('.'):
+            target_url = target_url[:-1]
+            
+        return f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<TargetEndpoint name="default">
+    <Description>Default target endpoint</Description>
+    <PreFlow name="PreFlow">
+        <Request/>
+        <Response/>
+    </PreFlow>
+    <PostFlow name="PostFlow">
+        <Request/>
+        <Response/>
+    </PostFlow>
+    <Flows/>
+    <HTTPTargetConnection>
+        <URL>{target_url}</URL>
+    </HTTPTargetConnection>
+</TargetEndpoint>'''
     
-    async def _mock_proxy_creation(self, details: Dict[str, Any]) -> Dict[str, Any]:
-        """Mock creation for development"""
-        logger.info("🧪 DEVELOPMENT MODE: Simulating proxy creation")
+    def _generate_proxy_xml(self, name: str, description: str, policies: List[str]) -> str:
+        """Generate main proxy XML"""
         
-        import asyncio
-        await asyncio.sleep(2)
+        # Build policy references
+        policy_refs = []
+        for policy in policies:
+            policy_refs.append(f'    <Policy>{policy}</Policy>')
         
-        return {
-            "status": "success",
-            "mode": "development_mock",
-            "message": "✅ Mock proxy created (DEVELOPMENT_MODE = True)",
-            "note": "Set DEVELOPMENT_MODE = False in config.py for real creation"
-        }
+        policy_xml = "\n".join(policy_refs) if policy_refs else ""
+        
+        return f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<APIProxy name="{name}">
+    <Description>{description}</Description>
+    <DisplayName>{name}</DisplayName>
+{policy_xml}
+    <ProxyEndpoints>
+        <ProxyEndpoint>default</ProxyEndpoint>
+    </ProxyEndpoints>
+    <Resources/>
+    <TargetEndpoints>
+        <TargetEndpoint>default</TargetEndpoint>
+    </TargetEndpoints>
+</APIProxy>'''
+    
+    def _create_javascript_resource(self, custom_logic: Dict[str, Any]) -> str:
+        """Create JavaScript resource content"""
+        if not custom_logic:
+            return "// Default JavaScript code\nconsole.log('Hello from Apigee');"
+            
+        if "javascript" in custom_logic and custom_logic["javascript"].get("required", False):
+            js_info = custom_logic["javascript"]
+            code = js_info.get("code", "").strip()
+            
+            if code:
+                return code
+            
+            # Generate based on purpose
+            purpose = js_info.get("purpose", "custom_processing")
+            
+            if purpose == "data_combination":
+                return """// Combine fields in response
+var response = context.getVariable('response.content');
+var data = JSON.parse(response);
+
+if (data.firstname && data.lastname) {
+    data.fullname = data.firstname + ' ' + data.lastname;
+}
+
+context.setVariable('response.content', JSON.stringify(data));"""
+                
+        return "// Default JavaScript code\nconsole.log('Hello from Apigee');"
+    
+    def create_proxy_bundle(self, details: Dict[str, Any]) -> bytes:
+        """Create proxy bundle ZIP file"""
+        try:
+            name = details["name"]
+            target_url = details["target_url"]
+            base_path = details["base_path"]
+            description = details.get("description", f"Proxy: {name}")
+            policies = details.get("policies", [])
+            custom_logic = details.get("custom_logic", {})
+            
+            # Create temporary directory
+            with tempfile.TemporaryDirectory() as temp_dir:
+                # Create directory structure
+                apiproxy_dir = os.path.join(temp_dir, "apiproxy")
+                policies_dir = os.path.join(apiproxy_dir, "policies")
+                proxies_dir = os.path.join(apiproxy_dir, "proxies")
+                targets_dir = os.path.join(apiproxy_dir, "targets")
+                resources_dir = os.path.join(apiproxy_dir, "resources")
+                jsc_dir = os.path.join(resources_dir, "jsc")
+                
+                os.makedirs(policies_dir, exist_ok=True)
+                os.makedirs(proxies_dir, exist_ok=True)
+                os.makedirs(targets_dir, exist_ok=True)
+                os.makedirs(jsc_dir, exist_ok=True)
+                
+                # Generate main proxy XML
+                proxy_xml = self._generate_proxy_xml(name, description, policies)
+                with open(os.path.join(apiproxy_dir, f"{name}.xml"), 'w', encoding='utf-8') as f:
+                    f.write(proxy_xml)
+                
+                # Generate policy XMLs
+                for policy in policies:
+                    policy_xml = self._generate_policy_xml(policy, custom_logic)
+                    with open(os.path.join(policies_dir, f"{policy}.xml"), 'w', encoding='utf-8') as f:
+                        f.write(policy_xml)
+                
+                # Generate JavaScript resources if needed
+                if "JavaScript" in policies:
+                    js_content = self._create_javascript_resource(custom_logic)
+                    with open(os.path.join(jsc_dir, "javascript-script.js"), 'w', encoding='utf-8') as f:
+                        f.write(js_content)
+                
+                # Generate proxy endpoint
+                proxy_endpoint_xml = self._generate_proxy_endpoint_xml(name, base_path, policies)
+                with open(os.path.join(proxies_dir, "default.xml"), 'w', encoding='utf-8') as f:
+                    f.write(proxy_endpoint_xml)
+                
+                # Generate target endpoint
+                target_endpoint_xml = self._generate_target_endpoint_xml(target_url)
+                with open(os.path.join(targets_dir, "default.xml"), 'w', encoding='utf-8') as f:
+                    f.write(target_endpoint_xml)
+                
+                # Create ZIP bundle
+                bundle_path = os.path.join(temp_dir, f"{name}-bundle.zip")
+                with zipfile.ZipFile(bundle_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                    for root, dirs, files in os.walk(apiproxy_dir):
+                        for file in files:
+                            file_path = os.path.join(root, file)
+                            arc_path = os.path.relpath(file_path, temp_dir)
+                            zipf.write(file_path, arc_path)
+                
+                # Read bundle as bytes
+                with open(bundle_path, 'rb') as f:
+                    bundle_content = f.read()
+                
+                logger.info(f"Created proxy bundle: {name} ({len(bundle_content)} bytes)")
+                return bundle_content
+                
+        except Exception as e:
+            logger.error(f"Error creating proxy bundle: {str(e)}")
+            raise e
+    
+    async def execute_proxy_creation(self, details: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute proxy creation in Apigee"""
+        try:
+            name = details["name"]
+            organization = details.get("organization", self.org)
+            token = details.get("token")
+            
+            # Temporarily set token if provided
+            original_token = None
+            if token:
+                original_token = os.getenv('APIGEE_TOKEN')
+                os.environ['APIGEE_TOKEN'] = token
+            
+            try:
+                # Create proxy bundle
+                bundle_content = self.create_proxy_bundle(details)
+                
+                # Upload to Apigee
+                url = f"{self.base_url}/organizations/{organization}/apis"
+                files = {
+                    'file': (f'{name}-bundle.zip', bundle_content, 'application/zip')
+                }
+                params = {'action': 'import', 'name': name}
+                
+                # Make request with query parameters
+                full_url = f"{url}?{'&'.join([f'{k}={v}' for k, v in params.items()])}"
+                result = self._make_request('POST', full_url, files=files)
+                
+                logger.info(f"✅ Proxy '{name}' created successfully")
+                
+                return {
+                    "success": True,
+                    "message": f"✅ Proxy '{name}' created successfully in Apigee",
+                    "proxy_name": name,
+                    "organization": organization,
+                    "revision": result.get("revision", "1"),
+                    "test_url": f"https://{organization}-{self.environment}.apigee.net{details['base_path']}"
+                }
+                
+            finally:
+                # Restore original token
+                if token and original_token is not None:
+                    os.environ['APIGEE_TOKEN'] = original_token
+                
+        except Exception as e:
+            error_msg = f"Failed to create proxy in Apigee: {str(e)}"
+            logger.error(error_msg)
+            return {
+                "success": False,
+                "message": error_msg,
+                "error": str(e)
+            }
+    
+    def analyze_requirements(self, requirements: str) -> str:
+        """Analyze requirements and suggest implementation approach"""
+        # Your implementation here
+        return f"Requirements analysis: {requirements[:50]}..."

@@ -1,65 +1,57 @@
-from typing import List
+from typing import List, Dict, Any
 from langchain.agents import Tool
 import re
+import json
+import os
 
 class PolicyTools:
-    """Shared policy and configuration tools"""
+    """Policy tools using minimal catalog + scraped documentation"""
+    
+    def __init__(self):
+        self.policy_catalog = self._load_policy_catalog()
+    
+    def _load_policy_catalog(self) -> Dict[str, Any]:
+        """Load minimal policy catalog"""
+        policy_docs_path = "./processed_docs/policy_docs.json"
+        if os.path.exists(policy_docs_path):
+            with open(policy_docs_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        return {"policies": {}}
     
     @staticmethod
     def suggest_policies(requirements: str) -> List[str]:
-        """Suggest policies based ONLY on what user explicitly asked for"""
-        policies = []
+        """Suggest policies based on keywords from minimal catalog"""
+        tools = PolicyTools()
         req = requirements.lower()
+        suggested = []
         
-        # Security - ONLY if explicitly mentioned
-        if any(word in req for word in ["api key", "apikey", "key auth", "verify key"]):
-            policies.append("VerifyAPIKey")
-        if any(word in req for word in ["oauth", "oauth2", "oauth 2.0"]):
-            policies.append("OAuthV2")
-        if any(word in req for word in ["jwt", "json web token", "jwt validation"]):
-            policies.append("VerifyJWT")
+        for policy_name, policy_info in tools.policy_catalog.get("policies", {}).items():
+            keywords = policy_info.get("keywords", [])
             
-        # CORS - ONLY if explicitly mentioned
-        if any(word in req for word in ["cors", "cross origin", "browser", "frontend"]):
-            policies.append("CORS")
-            
-        # Rate Limiting - ONLY if explicitly mentioned
-        if any(word in req for word in ["rate limit", "throttle", "requests per"]):
-            policies.append("Quota")
-        if any(word in req for word in ["spike", "traffic spike", "spike arrest"]):
-            policies.append("SpikeArrest")
-            
-        # Transformation - ONLY if explicitly mentioned
-        if any(word in req for word in ["json to xml", "xml transform", "transform"]):
-            policies.append("JSONToXML")
-        if any(word in req for word in ["validate json", "json validation", "schema"]):
-            policies.append("JSONThreatProtection")
-            
-        # Caching - ONLY if explicitly mentioned
-        if any(word in req for word in ["cache", "caching", "response cache"]):
-            policies.append("ResponseCache")
-            
-        return policies
+            # Check if any keyword matches
+            if any(keyword in req for keyword in keywords):
+                suggested.append(policy_name)
+        
+        return list(set(suggested))
     
     @staticmethod
     def explain_policies(policies: List[str]) -> str:
-        """Explain what each policy does"""
-        explanations = {
-            "VerifyAPIKey": "Validates API keys sent by client applications",
-            "OAuthV2": "Provides OAuth 2.0 authentication and authorization", 
-            "VerifyJWT": "Validates JSON Web Tokens for authentication",
-            "CORS": "Handles Cross-Origin Resource Sharing for browser requests",
-            "SpikeArrest": "Protects against sudden traffic spikes",
-            "Quota": "Enforces usage limits over time periods",
-            "JSONToXML": "Converts request/response between JSON and XML",
-            "JSONThreatProtection": "Validates JSON payloads against threats",
-            "ResponseCache": "Caches API responses to improve performance"
-        }
-        
+        """Explain policies - will use scraped documentation from knowledge base"""
         result = ""
         for policy in policies:
-            desc = explanations.get(policy, "Policy for enhanced API functionality")
-            result += f"• **{policy}**: {desc}\n"
+            result += f"• **{policy}**: Policy information will be retrieved from scraped Apigee documentation\n"
+        result += "\n💡 **Detailed policy information available from official Apigee docs in knowledge base**"
+        return result
+    
+    @staticmethod
+    def generate_policy_xml(policies: List[str]) -> str:
+        """Generate XML - will use templates from scraped documentation"""
+        result = f"\n🔧 **Policy XML Configuration:**\n\n"
+        for policy in policies:
+            result += f"📄 **{policy}.xml**\n"
+            result += f"```xml\n<!-- {policy} configuration will be generated from official Apigee documentation -->\n```\n\n"
+        
+        result += "💡 **Complete XML templates available from scraped Apigee documentation**\n"
         return result
     
     @staticmethod
@@ -93,27 +85,36 @@ class PolicyTools:
         return "/v1/api"
     
     @staticmethod
-    def extract_proxy_name(requirements: str) -> str:
-        """Extract proxy name from requirements"""
-        req = requirements.lower()
+    def extract_proxy_name(text: str) -> str:
+        """Extract proxy name from text with better pattern matching"""
+        import re
         
-        # Look for explicit proxy name mentions
+        # Pattern 1: "named [name]" or "called [name]"
         name_patterns = [
-            r'proxy\s+(?:name|called)\s+([a-zA-Z0-9\-_]+)',
-            r'(?:name|called)\s+([a-zA-Z0-9\-_]+)',
-            r'create\s+(?:a\s+)?([a-zA-Z0-9\-_]+)(?:\s+proxy)?'
+            r"named\s+([a-zA-Z0-9\-_]+)",
+            r"called\s+([a-zA-Z0-9\-_]+)",
+            r"proxy\s+([a-zA-Z0-9\-_]+)",
+            r"API\s+proxy\s+([a-zA-Z0-9\-_]+)",
+            r"create.*?([a-zA-Z0-9\-_]+)\s+with",
+            r"create.*?proxy.*?([a-zA-Z0-9\-_]+)"
         ]
         
         for pattern in name_patterns:
-            match = re.search(pattern, req)
-            if match:
-                name = match.group(1)
-                # Clean up common words that aren't actual names
-                if name not in ['proxy', 'api', 'service', 'endpoint']:
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            if matches:
+                name = matches[0].strip()
+                # Filter out common words that aren't proxy names
+                if name.lower() not in ['api', 'proxy', 'with', 'and', 'the', 'a', 'an']:
                     return name
         
-        # If no specific name found, return generic
-        return "api-proxy"
+        # Pattern 2: Look for hyphenated names (like portal-test-js)
+        hyphen_pattern = r"\b([a-zA-Z]+(?:-[a-zA-Z]+)+)\b"
+        matches = re.findall(hyphen_pattern, text)
+        for match in matches:
+            if match.lower() not in ['cross-origin', 'base-path']:
+                return match
+        
+        return None
     
     @staticmethod
     def generate_policy_steps(policies: List[str]) -> str:
@@ -122,108 +123,6 @@ class PolicyTools:
         for policy in policies:
             steps += f"                <Step><Name>{policy}</Name></Step>\n"
         return steps.rstrip()
-    
-    @staticmethod
-    def generate_policy_xml(policies: List[str]) -> str:
-        """Generate XML templates for requested policies only"""
-        templates = {
-            "VerifyAPIKey": '''```xml
-<!-- VerifyAPIKey.xml -->
-<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<VerifyAPIKey async="false" continueOnError="false" enabled="true" name="VerifyAPIKey">
-    <APIKey ref="request.queryparam.apikey"/>
-</VerifyAPIKey>
-```''',
-            "OAuthV2": '''```xml
-<!-- OAuthV2.xml -->
-<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<OAuthV2 async="false" continueOnError="false" enabled="true" name="OAuthV2">
-    <Operation>VerifyAccessToken</Operation>
-</OAuthV2>
-```''',
-            "VerifyJWT": '''```xml
-<!-- VerifyJWT.xml -->
-<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<VerifyJWT async="false" continueOnError="false" enabled="true" name="VerifyJWT">
-    <Source>request.header.authorization</Source>
-    <IgnoreUnresolvedVariables>false</IgnoreUnresolvedVariables>
-</VerifyJWT>
-```''',
-            "CORS": '''```xml
-<!-- CORS.xml -->
-<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<CORS async="false" continueOnError="false" enabled="true" name="CORS">
-    <AllowOrigins>*</AllowOrigins>
-    <AllowMethods>GET,POST,PUT,DELETE,OPTIONS</AllowMethods>
-    <AllowHeaders>Content-Type,Authorization,X-Requested-With</AllowHeaders>
-    <ExposeHeaders>Content-Length</ExposeHeaders>
-    <MaxAge>3628800</MaxAge>
-    <AllowCredentials>false</AllowCredentials>
-</CORS>
-```''',
-            "SpikeArrest": '''```xml
-<!-- SpikeArrest.xml -->
-<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<SpikeArrest async="false" continueOnError="false" enabled="true" name="SpikeArrest">
-    <Rate>10ps</Rate>
-</SpikeArrest>
-```''',
-            "Quota": '''```xml
-<!-- Quota.xml -->
-<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Quota async="false" continueOnError="false" enabled="true" name="Quota">
-    <Allow count="100"/>
-    <Interval>1</Interval>
-    <TimeUnit>minute</TimeUnit>
-    <Identifier ref="request.queryparam.apikey"/>
-</Quota>
-```''',
-            "JSONToXML": '''```xml
-<!-- JSONToXML.xml -->
-<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<JSONToXML async="false" continueOnError="false" enabled="true" name="JSONToXML">
-    <Source>request</Source>
-    <OutputVariable>request</OutputVariable>
-</JSONToXML>
-```''',
-            "JSONThreatProtection": '''```xml
-<!-- JSONThreatProtection.xml -->
-<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<JSONThreatProtection async="false" continueOnError="false" enabled="true" name="JSONThreatProtection">
-    <ArrayElementCount>20</ArrayElementCount>
-    <ContainerDepth>10</ContainerDepth>
-    <ObjectEntryCount>15</ObjectEntryCount>
-    <ObjectEntryNameLength>50</ObjectEntryNameLength>
-    <Source>request</Source>
-    <StringValueLength>500</StringValueLength>
-</JSONThreatProtection>
-```''',
-            "ResponseCache": '''```xml
-<!-- ResponseCache.xml -->
-<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<ResponseCache async="false" continueOnError="false" enabled="true" name="ResponseCache">
-    <CacheKey>
-        <Prefix/>
-        <KeyFragment ref="request.uri" type="string"/>
-    </CacheKey>
-    <Scope>Exclusive</Scope>
-    <ExpirySettings>
-        <ExpiryDate/>
-        <TimeOfDay/>
-        <TimeoutInSec ref="">300</TimeoutInSec>
-    </ExpirySettings>
-</ResponseCache>
-```'''
-        }
-        
-        policy_xmls = ""
-        for policy in policies:
-            if policy in templates:
-                policy_xmls += f"\n📄 **{policy}.xml**\n"
-                policy_xmls += templates[policy]
-                policy_xmls += "\n"
-        
-        return policy_xmls
 
 def create_common_tools(knowledge_service, apigee_service):
     """Create tools shared by both agents"""

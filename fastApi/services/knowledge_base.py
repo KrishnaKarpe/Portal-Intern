@@ -87,3 +87,30 @@ class KnowledgeService:
     
     def is_ready(self) -> bool:
         return bool(self.vectorstore and self.qa_chain)
+    
+    def search_policy_documentation(self, policy_name: str, query: str = "") -> str:
+        """Search for specific policy documentation"""
+        if not self.vectorstore:  # Changed from self.collection
+            return f"Knowledge base not initialized for {policy_name} policy"
+        
+        try:
+            # Search for policy-specific information
+            search_query = f"{policy_name} policy {query}".strip()
+            
+            # Use vectorstore similarity search
+            results = self.vectorstore.similarity_search(
+                search_query,
+                k=3,
+                filter={"type": "policy_doc"}  # Filter for policy documents
+            )
+            
+            if results:
+                # Return the most relevant policy documentation
+                policy_info = "\n".join([doc.page_content for doc in results])
+                return f"📚 **{policy_name} Policy Documentation:**\n\n{policy_info}"
+            else:
+                return f"No specific documentation found for {policy_name} policy"
+                
+        except Exception as e:
+            logger.error(f"Error searching policy documentation: {str(e)}")
+            return f"Error retrieving {policy_name} policy information"
