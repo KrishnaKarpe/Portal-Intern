@@ -95,7 +95,7 @@ class ApigeeAIAssistant:
                 # Updated to use the free llama-3.3-70b-versatile model
                 self.llm_creative = ChatGroq(
                     groq_api_key=self.groq_api_key,
-                    model_name="llama-3.3-70b-versatile",  # Updated free model
+                    model_name="llama-3.3-70b-versatile",  
                     temperature=0.7,
                     max_tokens=2048
                 )
@@ -198,22 +198,22 @@ class ApigeeAIAssistant:
                 Tool(
                     name="Search_Apigee_Documentation",
                     func=self.search_documentation,
-                    description="Search Apigee documentation and best practices from knowledge base"
+                    description="ALWAYS use this first to search Apigee documentation and best practices from knowledge base. Required for all Apigee-related queries."
                 ),
                 Tool(
-                    name="Analyze_Proxy_Requirements",
+                    name="Analyze_Proxy_Requirements", 
                     func=self.analyze_requirements,
-                    description="Analyze user requirements and suggest proxy configuration"
+                    description="Use this to analyze user requirements and suggest proxy configuration based on documentation"
                 ),
                 Tool(
                     name="Generate_Proxy_Config",
                     func=self.generate_proxy_config,
-                    description="Generate XML configuration for Apigee proxy"
+                    description="Generate complete XML configuration for Apigee proxy with policies"
                 ),
                 Tool(
                     name="Suggest_Policies",
                     func=self.suggest_policies,
-                    description="Suggest appropriate policies based on requirements"
+                    description="Suggest appropriate Apigee policies based on requirements and best practices"
                 )
             ]
             
@@ -225,31 +225,64 @@ class ApigeeAIAssistant:
                     description="Create an API proxy in Apigee (requires confirmation)"
                 ),
                 Tool(
-                    name="Deploy_Proxy",
+                    name="Deploy_Proxy", 
                     func=self.deploy_proxy,
                     description="Deploy proxy to environment (requires confirmation)"
                 )
             ]
             
-            # Ask Mode Agent (Copilot-like)
+            # Enhanced system prompts
+            ask_system_prompt = """You are an expert Apigee API management consultant. 
+
+CRITICAL: For ANY Apigee-related question, you MUST:
+1. FIRST use Search_Apigee_Documentation to find relevant information
+2. THEN use other tools as needed to provide comprehensive answers
+3. Always reference the official documentation in your responses
+
+You have access to comprehensive Apigee documentation including:
+- API proxy creation and configuration
+- Security policies (OAuth, API Keys, JWT, CORS)
+- Rate limiting and quota management  
+- Best practices and troubleshooting
+- Deployment and monitoring
+
+Always provide detailed, practical guidance with code examples when possible."""
+
+            agent_system_prompt = """You are an autonomous Apigee AI agent that can create and configure API proxies.
+
+CRITICAL: For ANY request, you MUST:
+1. FIRST use Search_Apigee_Documentation to understand requirements and best practices
+2. Use Analyze_Proxy_Requirements to plan the proxy configuration  
+3. Use Generate_Proxy_Config to create XML configurations
+4. Offer to Create_API_Proxy with user confirmation
+
+You can autonomously create proxies but always require user confirmation before making changes."""
+            
+            # Ask Mode Agent (Documentation-focused)
             self.ask_agent = initialize_agent(
                 common_tools,
                 self.llm_creative,
                 agent=AgentType.CONVERSATIONAL_REACT_DESCRIPTION,
                 verbose=True,
-                memory=self.memory
+                memory=self.memory,
+                agent_kwargs={
+                    "system_message": ask_system_prompt
+                }
             )
             
-            # Agent Mode (Autonomous)
+            # Agent Mode (Action-focused)
             self.agent = initialize_agent(
                 agent_tools,
                 self.llm_precise,
                 agent=AgentType.CONVERSATIONAL_REACT_DESCRIPTION,
                 verbose=True,
-                memory=self.memory
+                memory=self.memory,
+                agent_kwargs={
+                    "system_message": agent_system_prompt
+                }
             )
             
-            logger.info("Agents setup successfully with Groq")
+            logger.info("Agents setup successfully with enhanced prompts")
             
         except Exception as e:
             logger.error(f"Error setting up agents: {str(e)}")
@@ -518,14 +551,23 @@ async def chat_with_bot(chat_message: ChatMessage):
                 "requires_confirmation": False
             }
         
+        # Enhanced prompt to force knowledge base usage
+        enhanced_message = f"""
+Based on the Apigee documentation and best practices, please help with this request:
+
+{chat_message.message}
+
+Important: Always search the knowledge base first to provide accurate, documentation-backed responses.
+        """
+        
         if chat_message.mode == ChatMode.ASK:
             response = assistant.ask_agent.run(
-                input=chat_message.message,
+                input=enhanced_message,
                 chat_history=assistant.memory.chat_memory.messages
             )
         else:
             response = assistant.agent.run(
-                input=chat_message.message,
+                input=enhanced_message,
                 chat_history=assistant.memory.chat_memory.messages
             )
         
