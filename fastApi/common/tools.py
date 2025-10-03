@@ -1,8 +1,8 @@
+import os
+import json
+import re
 from typing import List, Dict, Any
 from langchain.agents import Tool
-import re
-import json
-import os
 
 class PolicyTools:
     """Policy tools using minimal catalog + scraped documentation"""
@@ -21,35 +21,57 @@ class PolicyTools:
     @staticmethod
     def suggest_policies(requirements: str) -> List[str]:
         """Suggest policies based on keywords from minimal catalog"""
-        tools = PolicyTools()
         req = requirements.lower()
         suggested = []
         
-        for policy_name, policy_info in tools.policy_catalog.get("policies", {}).items():
-            keywords = policy_info.get("keywords", [])
+        if any(word in req for word in ["security", "api key", "apikey", "auth"]):
+            suggested.append("VerifyAPIKey")
+        
+        if any(word in req for word in ["cors", "cross", "browser"]):
+            suggested.append("CORS")
             
-            # Check if any keyword matches
-            if any(keyword in req for keyword in keywords):
-                suggested.append(policy_name)
+        if any(word in req for word in ["rate", "limit", "quota", "throttle"]):
+            suggested.append("Quota")
+            
+        if any(word in req for word in ["spike", "burst", "arrest"]):
+            suggested.append("SpikeArrest")
+            
+        if any(word in req for word in ["javascript", "js", "script", "transform"]):
+            suggested.append("JavaScript")
         
         return list(set(suggested))
     
     @staticmethod
     def explain_policies(policies: List[str]) -> str:
         """Explain policies - will use scraped documentation from knowledge base"""
-        result = ""
+        if not policies:
+            return "No specific policies identified from requirements."
+            
+        explanations = {
+            "VerifyAPIKey": "API Key verification for authentication and security",
+            "CORS": "Cross-Origin Resource Sharing for browser-based clients", 
+            "Quota": "Rate limiting to control API usage and prevent abuse",
+            "SpikeArrest": "Protects against traffic spikes and bursts",
+            "JavaScript": "Custom JavaScript logic for data transformation"
+        }
+        
+        result = "**Suggested Policies:**\n"
         for policy in policies:
-            result += f"• **{policy}**: Policy information will be retrieved from scraped Apigee documentation\n"
+            desc = explanations.get(policy, f"{policy} policy")
+            result += f"• **{policy}**: {desc}\n"
+        
         result += "\n💡 **Detailed policy information available from official Apigee docs in knowledge base**"
         return result
     
     @staticmethod
     def generate_policy_xml(policies: List[str]) -> str:
         """Generate XML - will use templates from scraped documentation"""
+        if not policies:
+            return "No policies to generate XML for."
+            
         result = f"\n🔧 **Policy XML Configuration:**\n\n"
         for policy in policies:
-            result += f"📄 **{policy}.xml**\n"
-            result += f"```xml\n<!-- {policy} configuration will be generated from official Apigee documentation -->\n```\n\n"
+            result += f"**{policy}.xml** - Standard template available\n"
         
         result += "💡 **Complete XML templates available from scraped Apigee documentation**\n"
         return result
@@ -64,65 +86,47 @@ class PolicyTools:
     
     @staticmethod
     def extract_base_path(requirements: str) -> str:
-        """Extract base path from requirements - purely dynamic based on user input"""
-        req = requirements.lower()
-        
-        # Look for explicit base path mentions first
-        if "base path" in req or "basepath" in req:
-            # Try to extract path after "base path"
-            path_match = re.search(r'base\s*path[:\s]+([/\w\-_/.]+)', req)
-            if path_match:
-                path = path_match.group(1)
-                # Ensure it starts with /
-                return path if path.startswith('/') else f'/{path}'
-        
-        # Look for any path patterns in the text (starting with /)
-        path_match = re.search(r'(/[/\w\-_.]+)', requirements)
-        if path_match:
-            return path_match.group(1)
-        
-        # If no specific path found, generate generic versioned path
-        return "/v1/api"
+        """Extract base path from requirements"""
+        # Look for path patterns like /api/v1, /v1/users, etc.
+        path_pattern = r'/[a-zA-Z0-9/_-]+'
+        paths = re.findall(path_pattern, requirements)
+        # Filter out URLs and get actual paths
+        valid_paths = [p for p in paths if not p.startswith('//')]
+        return valid_paths[0] if valid_paths else "/v1/api"
     
     @staticmethod
     def extract_proxy_name(text: str) -> str:
-        """Extract proxy name from text with better pattern matching"""
-        import re
-        
-        # Pattern 1: "named [name]" or "called [name]"
+        """Extract proxy name from text"""
+        # Look for patterns like "name: xyz", "called xyz", "proxy xyz"
         name_patterns = [
-            r"named\s+([a-zA-Z0-9\-_]+)",
-            r"called\s+([a-zA-Z0-9\-_]+)",
-            r"proxy\s+([a-zA-Z0-9\-_]+)",
-            r"API\s+proxy\s+([a-zA-Z0-9\-_]+)",
-            r"create.*?([a-zA-Z0-9\-_]+)\s+with",
-            r"create.*?proxy.*?([a-zA-Z0-9\-_]+)"
+            r'name[:\s]+([a-zA-Z0-9\-_]+)',
+            r'called\s+([a-zA-Z0-9\-_]+)',
+            r'proxy\s+([a-zA-Z0-9\-_]+)'
         ]
         
         for pattern in name_patterns:
-            matches = re.findall(pattern, text, re.IGNORECASE)
-            if matches:
-                name = matches[0].strip()
-                # Filter out common words that aren't proxy names
-                if name.lower() not in ['api', 'proxy', 'with', 'and', 'the', 'a', 'an']:
-                    return name
+            match = re.search(pattern, text.lower())
+            if match:
+                return match.group(1).replace(' ', '-')
         
-        # Pattern 2: Look for hyphenated names (like portal-test-js)
-        hyphen_pattern = r"\b([a-zA-Z]+(?:-[a-zA-Z]+)+)\b"
-        matches = re.findall(hyphen_pattern, text)
-        for match in matches:
-            if match.lower() not in ['cross-origin', 'base-path']:
-                return match
-        
-        return None
+        return "generated-proxy"
     
     @staticmethod
     def generate_policy_steps(policies: List[str]) -> str:
-        """Generate XML policy steps"""
-        steps = ""
-        for policy in policies:
-            steps += f"                <Step><Name>{policy}</Name></Step>\n"
-        return steps.rstrip()
+        """Generate policy execution steps"""
+        if not policies:
+            return "No policies configured."
+            
+        result = "**Policy Execution Flow:**\n"
+        request_policies = [p for p in policies if p in ["VerifyAPIKey", "CORS", "SpikeArrest"]]
+        response_policies = [p for p in policies if p in ["JavaScript", "Quota"]]
+        
+        if request_policies:
+            result += f"**Request Flow:** {' → '.join(request_policies)}\n"
+        if response_policies:
+            result += f"**Response Flow:** {' → '.join(response_policies)}\n"
+            
+        return result
 
 def create_common_tools(knowledge_service, apigee_service):
     """Create tools shared by both agents"""
@@ -133,7 +137,7 @@ def create_common_tools(knowledge_service, apigee_service):
             description="ALWAYS search documentation first for accurate responses"
         ),
         Tool(
-            name="Analyze_Proxy_Requirements",
+            name="Analyze_Proxy_Requirements", 
             func=lambda req: apigee_service.analyze_requirements(
                 req, knowledge_service.search_documentation(f"proxy best practices {req}")
             ),

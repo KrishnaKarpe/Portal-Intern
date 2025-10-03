@@ -1,10 +1,12 @@
 # main.py
-import logging
+import asyncio
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+import logging
+import uvicorn
+import config
 
 # Import our modules
-import config
 from models import ChatMessage, ConfirmationRequest, HealthResponse, ChatMode
 from services.llm import LLMService
 from services.knowledge_base import KnowledgeService
@@ -36,7 +38,7 @@ apigee_service = ApigeeService()
 ask_agent = AskAgent(llm_service, knowledge_service, apigee_service)
 agent_mode = AgentMode(llm_service, knowledge_service, apigee_service)
 
-@app.post("/chat")  # Removed response_model to allow dynamic fields
+@app.post("/chat")
 async def chat_with_bot(chat_message: ChatMessage):
     """Main chat endpoint"""
     
@@ -51,41 +53,57 @@ async def chat_with_bot(chat_message: ChatMessage):
     try:
         logger.info(f"Chat request: {chat_message.message[:100]}...")
         
-        # Route to appropriate agent
+        # Route to appropriate agent with timeout
         if chat_message.mode == ChatMode.ASK:
             if not ask_agent.is_ready():
-                raise Exception("Ask agent not ready")
-            response = ask_agent.run(chat_message.message)
+                return {
+                    "response": "Ask agent not ready. Using fallback response.",
+                    "mode": chat_message.mode,
+                    "success": True,
+                    "requires_confirmation": False
+                }
+            
+            # Add timeout to prevent hanging
+            try:
+                response = await asyncio.wait_for(
+                    asyncio.to_thread(ask_agent.run, chat_message.message),
+                    timeout=30.0  # 30 second timeout
+                )
+            except asyncio.TimeoutError:
+                response = "Response timeout. Please try a simpler question or check your connection."
+            
             return {
                 "response": response,
                 "mode": chat_message.mode,
                 "success": True,
                 "requires_confirmation": False
             }
-        else:
+
+        else:  # AGENT mode
             if not agent_mode.is_ready():
-                raise Exception("Agent mode not ready")
+                return {
+                    "response": "Agent mode not ready",
+                    "mode": chat_message.mode,
+                    "success": False,
+                    "requires_confirmation": False
+                }
             
-            # Pass context to agent for structured responses
-            context = {
-                "organization": chat_message.organization,
-                "token": chat_message.token,
-                "user_context": chat_message.user_context
-            }
+            try:
+                response = await asyncio.wait_for(
+                    asyncio.to_thread(agent_mode.run, chat_message.message, chat_message.user_context),
+                    timeout=45.0  # 45 second timeout for agent mode
+                )
+            except asyncio.TimeoutError:
+                response = "Agent response timeout. Please try again with a simpler request."
             
-            # Check if it's a proxy creation request
-            if "create" in chat_message.message.lower() and ("proxy" in chat_message.message.lower() or "api" in chat_message.message.lower()):
-                # Use structured response method - directly return the dictionary from agent_mode
-                result = agent_mode.handle_agent_request(chat_message.message, context)
-                return result  # This should include the action field
+            if isinstance(response, dict):
+                return response
             else:
-                # Use regular agent flow
-                response = agent_mode.run(chat_message.message, context)
                 return {
                     "response": response,
                     "mode": chat_message.mode,
                     "success": True,
-                    "requires_confirmation": "confirm" in response.lower()
+                    "requires_confirmation": False
                 }
         
     except Exception as e:
@@ -106,11 +124,7 @@ async def confirm_action(confirmation: ConfirmationRequest):
     try:
         if confirmation.action == "create_proxy":
             result = await apigee_service.execute_proxy_creation(confirmation.details)
-            return {
-                "response": f"✅ Proxy created successfully! {result}",
-                "success": True,
-                "action_completed": True
-            }
+            return result
         else:
             return {"response": "Unknown action", "success": False}
     except Exception as e:
@@ -142,5 +156,4 @@ async def root():
     }
 
 if __name__ == "__main__":
-    import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8001)

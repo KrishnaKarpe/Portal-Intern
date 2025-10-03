@@ -4,8 +4,8 @@ import requests
 import zipfile
 import tempfile
 import logging
-from typing import Dict, Any, List
 import re
+from typing import Dict, Any, List
 
 logger = logging.getLogger(__name__)
 
@@ -353,7 +353,123 @@ context.setVariable('response.content', JSON.stringify(data));"""
                 "error": str(e)
             }
     
-    def analyze_requirements(self, requirements: str) -> str:
+    def analyze_requirements(self, requirements: str, documentation: str = None) -> str:
         """Analyze requirements and suggest implementation approach"""
-        # Your implementation here
-        return f"Requirements analysis: {requirements[:50]}..."
+        # Extract key features
+        features = []
+        
+        if "security" in requirements.lower() or "api key" in requirements.lower():
+            features.append("• API Key verification for security")
+        
+        if "rate" in requirements.lower() or "limit" in requirements.lower() or "quota" in requirements.lower():
+            features.append("• Rate limiting to prevent abuse")
+            
+        if "cors" in requirements.lower() or "cross" in requirements.lower():
+            features.append("• CORS support for browser clients")
+            
+        if "javascript" in requirements.lower() or "custom logic" in requirements.lower():
+            features.append("• Custom JavaScript processing")
+            
+        if "cache" in requirements.lower():
+            features.append("• Response caching for performance")
+            
+        # Construct analysis response
+        response = f"## Requirements Analysis:\n\n"
+        
+        if features:
+            response += "**Identified Requirements:**\n" + "\n".join(features) + "\n\n"
+        else:
+            response += "**Basic proxy with target endpoint.**\n\n"
+            
+        response += "**Suggested Implementation:**\n"
+        response += "1. Create API proxy with proper naming\n"
+        response += "2. Configure target endpoint\n"
+        
+        if features:
+            response += "3. Apply identified policies\n"
+            response += "4. Test thoroughly with sample requests\n"
+            
+        if documentation:
+            response += f"\n**Documentation:**\n{documentation}"
+            
+        return response
+    
+    def create_api_proxy(self, requirements: str) -> str:
+        """Create API proxy based on requirements (mock for agent use)"""
+        # This is just a placeholder for the agent to use
+        # Actual implementation happens in execute_proxy_creation
+        
+        config = self.generate_proxy_config(requirements)
+        
+        return f"""
+✅ **API Proxy Ready for Creation**
+
+{config}
+
+To proceed with creation, please confirm by responding with:
+"Yes, create this proxy" or provide your Apigee credentials if needed.
+"""
+    
+    def generate_proxy_config(self, requirements: str) -> str:
+        """Generate proxy configuration XML based on requirements"""
+        # Extract basic info
+        name = "sample-proxy"
+        target_url = "https://api.example.com"
+        base_path = "/v1/sample"
+        policies = []
+        
+        # Try to extract information from requirements
+        if requirements:
+            name_match = re.search(r'proxy\s+name[:\s]+([a-zA-Z0-9\-_]+)', requirements.lower())
+            if name_match:
+                name = name_match.group(1)
+            
+            url_match = re.search(r'target\s+url[:\s]+(https?://[^\s]+)', requirements.lower())
+            if url_match:
+                target_url = url_match.group(1)
+            
+            path_match = re.search(r'base\s+path[:\s]+(/[^\s]+)', requirements.lower())
+            if path_match:
+                base_path = path_match.group(1)
+            
+            # Add policy detection
+            if "security" in requirements.lower() or "apikey" in requirements.lower():
+                policies.append("VerifyAPIKey")
+            
+            if "cors" in requirements.lower() or "cross" in requirements.lower():
+                policies.append("CORS")
+            
+            if "quota" in requirements.lower() or "rate limit" in requirements.lower():
+                policies.append("Quota")
+            
+            if "javascript" in requirements.lower() or "js" in requirements.lower():
+                policies.append("JavaScript")
+        
+        # Generate basic proxy XML
+        proxy_xml = self._generate_proxy_xml(name, f"Auto-generated proxy for {name}", policies)
+        endpoint_xml = self._generate_proxy_endpoint_xml(name, base_path, policies)
+        target_xml = self._generate_target_endpoint_xml(target_url)
+        
+        # Format response
+        response = f"""
+## Generated Proxy Configuration
+
+### Main Proxy XML:
+```xml
+{proxy_xml}
+```
+
+### Proxy Endpoint XML:
+```xml
+{endpoint_xml}
+```
+
+### Target Endpoint XML:
+```xml
+{target_xml}
+```
+
+**Note:** This is a sample configuration based on extracted requirements. Please review and adjust policies and settings as necessary.
+"""
+        
+        return response.strip()
