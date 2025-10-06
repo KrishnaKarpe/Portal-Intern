@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ChevronsLeft, ChevronsRight, Layers, RefreshCw, List, Package } from 'lucide-react';
+import { ChevronsLeft, ChevronsRight, Layers, RefreshCw, List, Package, GitBranch } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const menuItems = [
@@ -26,7 +26,11 @@ const menuItems = [
     path: '/move-proxy',
     icon: <Package className="h-5 w-5 mr-3" />,
   },
-
+  {
+    name: 'Apigee → GitLab',
+    path: '/gitlab',
+    icon: <GitBranch className="h-5 w-5 mr-3" />,
+  },
   {
     name: 'List All Proxies',
     path: '/list-proxies',

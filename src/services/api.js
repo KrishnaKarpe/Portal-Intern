@@ -200,3 +200,116 @@ export const MoveProxy = async (proxyData) => {
     throw error;
   }
 };
+
+// ---------------------------
+// GitLab API helpers (direct)
+// ---------------------------
+const GITLAB_API_URL = 'https://gitlab.com/api/v4';
+
+/**
+ * Create a GitLab project
+ * @param {Object} params { token, name, namespaceId, templateName }
+ */
+export const gitlabCreateProject = async ({ token, name, namespaceId, templateName }) => {
+  const form = new FormData();
+  form.append('name', name);
+  if (namespaceId) form.append('namespace_id', String(namespaceId));
+  if (templateName) form.append('template_name', templateName);
+
+  const response = await fetch(`${GITLAB_API_URL}/projects`, {
+    method: 'POST',
+    headers: { 'PRIVATE-TOKEN': token },
+    body: form,
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.message || data.error || 'Failed to create project');
+  return data;
+};
+
+/**
+ * Create a branch in a project
+ * @param {Object} params { token, projectId, branch, ref }
+ */
+export const gitlabCreateBranch = async ({ token, projectId, branch, ref = 'master' }) => {
+  const url = `${GITLAB_API_URL}/projects/${encodeURIComponent(projectId)}/repository/branches?branch=${encodeURIComponent(branch)}&ref=${encodeURIComponent(ref)}`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'PRIVATE-TOKEN': token },
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.message || data.error || 'Failed to create branch');
+  return data;
+};
+
+/**
+ * Get repository tree
+ * @param {Object} params { token, projectId, ref }
+ */
+export const gitlabGetTree = async ({ token, projectId, ref = 'master' }) => {
+  const url = `${GITLAB_API_URL}/projects/${encodeURIComponent(projectId)}/repository/tree?ref=${encodeURIComponent(ref)}`;
+  const response = await fetch(url, { headers: { 'PRIVATE-TOKEN': token } });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.message || data.error || 'Failed to fetch tree');
+  return data;
+};
+
+/**
+ * Get repository tree at path
+ * @param {Object} params { token, projectId, path, ref }
+ */
+export const gitlabGetTreeAtPath = async ({ token, projectId, path, ref = 'master' }) => {
+  const url = `${GITLAB_API_URL}/projects/${encodeURIComponent(projectId)}/repository/tree?path=${encodeURIComponent(path)}&ref=${encodeURIComponent(ref)}`;
+  const response = await fetch(url, { headers: { 'PRIVATE-TOKEN': token } });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.message || data.error || 'Failed to fetch tree at path');
+  return data;
+};
+
+/**
+ * Get raw file content
+ * @param {Object} params { token, projectId, filePath, ref }
+ */
+export const gitlabGetRawFile = async ({ token, projectId, filePath, ref = 'master' }) => {
+  const url = `${GITLAB_API_URL}/projects/${encodeURIComponent(projectId)}/repository/files/${encodeURIComponent(filePath)}/raw?ref=${encodeURIComponent(ref)}`;
+  const response = await fetch(url, { headers: { 'PRIVATE-TOKEN': token } });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || data.error || 'Failed to fetch file');
+  }
+  const text = await response.text();
+  return text;
+};
+
+/**
+ * Download repository archive (returns Blob)
+ * @param {Object} params { token, projectId, sha }
+ */
+export const gitlabGetArchive = async ({ token, projectId, sha = 'master' }) => {
+  const url = `${GITLAB_API_URL}/projects/${encodeURIComponent(projectId)}/repository/archive.tar.gz?sha=${encodeURIComponent(sha)}`;
+  const response = await fetch(url, { headers: { 'PRIVATE-TOKEN': token } });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || data.error || 'Failed to fetch archive');
+  }
+  const blob = await response.blob();
+  return blob;
+};
+
+/**
+ * Create or update a file in repository
+ * @param {Object} params { token, projectId, filePath, branch, content, commitMessage, method }
+ */
+export const gitlabUpsertFile = async ({ token, projectId, filePath, branch = 'master', content, commitMessage, method = 'POST' }) => {
+  const url = `${GITLAB_API_URL}/projects/${encodeURIComponent(projectId)}/repository/files/${encodeURIComponent(filePath)}`;
+  const response = await fetch(url, {
+    method, // 'POST' to create, 'PUT' to update
+    headers: {
+      'PRIVATE-TOKEN': token,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ branch, content, commit_message: commitMessage }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.message || data.error || 'Failed to upsert file');
+  return data;
+};
