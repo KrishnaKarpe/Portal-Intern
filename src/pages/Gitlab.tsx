@@ -29,7 +29,7 @@ const Gitlab: React.FC = () => {
   const [formData, setFormData] = useState({
     gitlabGroupName: '',
     gitlabAccessToken: '',
-    gitRef: 'master',
+    gitRef: 'master/main',
     apigeeToken: '',
     proxyName: '',
     revision: '',
