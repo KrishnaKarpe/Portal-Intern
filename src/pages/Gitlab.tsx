@@ -12,6 +12,8 @@ import {
   ArrowRight,
 } from 'lucide-react';
 
+import { pushProxyToGitlab } from '@/services/api';
+
 // Static options for Apigee orgs; adjust as needed
 const organizations = [
   { id: 1, name: 'apigee-prod-ouax', type: 'Production' },
@@ -59,8 +61,17 @@ const Gitlab: React.FC = () => {
     try {
       setIsLoading(true);
       // Simulate backend operation for now
-      await new Promise((res) => setTimeout(res, 700));
-      toast.success('Created file(s) in GitLab project');
+      const payload = {
+        sourceOrg: apigeeOrg,
+        sourceToken: formData.apigeeToken,
+        proxyName: formData.proxyName,
+        revision: formData.revision,
+        gitToken: formData.gitlabAccessToken,
+        branch: formData.gitRef || 'master', // default branch if empty
+      };
+      const response = await pushProxyToGitlab(payload); 
+      toast.success(`Proxy ${formData.proxyName} pushed successfully`);
+      
     } catch (e: any) {
       toast.error(e?.message || 'Failed pushing proxy to GitLab');
     } finally {
@@ -70,7 +81,7 @@ const Gitlab: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast.message('Configuration saved');
+    toast.success('Configuration saved');
   };
 
   return (

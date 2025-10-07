@@ -265,14 +265,6 @@ const SendProxyToOrg = async (orgId, proxyName, token, proxyBundle) => {
   } catch (error) {
     console.error(`Error importing proxy ${proxyName}:`, error.message);
 
-    if (error.response) {
-      console.error('Response status:', error.response.status);
-      console.error('Response data:', error.response.data);
-    }
-
-    const statusCode = error.response?.status || 500;
-    const errorMessage = error.response?.data?.error?.message || error.message;
-
     const enhancedError = new Error(errorMessage);
     enhancedError.status = statusCode;
     enhancedError.details = error.response?.data;
@@ -281,13 +273,124 @@ const SendProxyToOrg = async (orgId, proxyName, token, proxyBundle) => {
   }
 };
 
+
+/**
+ * Fetch GitLab project ID using project name
+ * @param {string} proxyName - Project name (same as proxy name)
+ * @param {string} token - GitLab access token
+ * @returns {Promise<number>} - Project ID
+ */
+const getGitlabProjectId = async (proxyName, token) => {
+  const response = await axios.get('https://gitlab.com/api/v4/projects', {
+    headers: { 'PRIVATE-TOKEN': token },
+    params: { search: proxyName }
+  });
+
+  const project = response.data.find(p => p.name === proxyName);
+  if (!project) throw new Error(`Project ${proxyName} not found in GitLab`);
+  return project.id;
+};
+
+
+/**
+ * Create a new project in GitLab if it doesn’t exist
+ * @param {string} proxyName - Project name (same as proxy name)
+ * @param {string} token - GitLab access token
+ * @returns {Promise<number>} - Newly created project ID
+ */
+const createGitlabProject = async (proxyName, token) => {
+  try {
+    console.log(`Creating new GitLab project: ${proxyName}`);
+    const response = await axios.post(
+      'https://gitlab.com/api/v4/projects',
+      {
+        name: proxyName,
+        namespace_id: 116698866, 
+        visibility: 'private',
+      },
+      {
+        headers: { 'PRIVATE-TOKEN': token },
+      }
+    );
+    console.log(`✅ Created project ${proxyName} with ID ${response.data.id}`);
+    return response.data.id;
+  } catch (error) {
+    console.error('❌ Failed to create GitLab project:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+
+/**
+ * Upload proxy bundle to GitLab project (creates project if missing)
+ * @param {string} proxyName - Proxy name / GitLab project name
+ * @param {string} token - GitLab access token
+ * @param {Buffer} proxyBundle - Proxy bundle binary (zip)
+ * @param {string} branch
+ * @returns {Promise<Object>} - Upload response
+ */
+const sendProxyToGitlab = async (proxyName, token, proxyBundle, branch) => {
+  try {
+    console.log(`Checking for GitLab project: ${proxyName}`);
+
+    // Step 1: Try to get existing project
+    let projectId;
+    try {
+      projectId = await getGitlabProjectId(proxyName, token);
+      console.log(`Found GitLab project ${proxyName} (ID: ${projectId})`);
+    } catch {
+      console.log(`Project ${proxyName} not found. Creating new project...`);
+      projectId = await createGitlabProject(proxyName, token);
+    }
+
+    // Step 2: Encode proxy bundle (GitLab API expects base64 for file uploads)
+    const base64Data = Buffer.from(proxyBundle).toString('base64');
+
+    // Step 3: Upload proxy zip to GitLab
+    const fileName = `${proxyName}.zip`;
+    console.log(`Uploading ${fileName} to GitLab project ${projectId}`);
+
+    const uploadUrl = `https://gitlab.com/api/v4/projects/${projectId}/repository/files/${encodeURIComponent(fileName)}`;
+
+    const response = await axios.post(
+      uploadUrl,
+      {
+        branch: branch,
+        content: base64Data,
+        commit_message: `Upload proxy bundle for ${proxyName}`,
+        encoding: 'base64',
+      },
+      {
+        headers: {
+          'PRIVATE-TOKEN': token,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    console.log(`✅ Proxy bundle uploaded successfully to ${proxyName}`);
+    return response.data;
+
+  } catch (error) {
+    console.error('❌ Error uploading proxy to GitLab:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+
+    
+
 // Export functions with clear naming
 module.exports = {
   fetchProductFromOrg,
   fetchAllProductsFromOrg,
   modifyProductForClone,
   createProductInOrg,
-  fetchProxyFromOrg,                  // Fetch single proxy
-  SendProxyToOrg
+  fetchProxyFromOrg,                  
+  SendProxyToOrg,
+  sendProxyToGitlab,
+  createGitlabProject,
+  getGitlabProjectId,
+
 
 };
