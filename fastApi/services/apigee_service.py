@@ -231,14 +231,14 @@ class ApigeeService:
             
             if purpose == "data_combination":
                 return """// Combine fields in response
-var response = context.getVariable('response.content');
-var data = JSON.parse(response);
+            var response = context.getVariable('response.content');
+            var data = JSON.parse(response);
 
-if (data.firstname && data.lastname) {
-    data.fullname = data.firstname + ' ' + data.lastname;
-}
+            if (data.firstname && data.lastname) {
+                data.fullname = data.firstname + ' ' + data.lastname;
+            }
 
-context.setVariable('response.content', JSON.stringify(data));"""
+            context.setVariable('response.content', JSON.stringify(data));"""
                 
         return "// Default JavaScript code\nconsole.log('Hello from Apigee');"
     
