@@ -239,20 +239,29 @@ class ApigeeAIInterface:
             details = st.session_state.action_details
             
             if action == "create_proxy":
-                st.info(f"**Ready to create proxy:** {details.get('name', 'Unknown')}")
+                # Get proxy details safely
+                proxy_details = details.get('proxy_details', {})
+                proxy_name = proxy_details.get('name', 'Unknown')
+                
+                st.info(f"**Ready to create proxy:** {proxy_name}")
                 
                 # Show proxy details
                 col1, col2 = st.columns(2)
                 with col1:
                     st.write("**Proxy Details:**")
-                    st.write(f"- Name: `{details.get('name', 'N/A')}`")
-                    st.write(f"- Base Path: `{details.get('base_path', 'N/A')}`")
-                    st.write(f"- Target URL: `{details.get('target_url', 'N/A')}`")
+                    st.write(f"- Name: `{proxy_details.get('name', 'N/A')}`")
+                    st.write(f"- Base Path: `{proxy_details.get('base_path', 'N/A')}`")
+                    st.write(f"- Target URL: `{proxy_details.get('target_url', 'N/A')}`")
                 
                 with col2:
                     st.write("**Configuration:**")
                     st.write(f"- Organization: `{details.get('organization', 'N/A')}`")
-                    st.write(f"- Policies: `{', '.join(details.get('policies', []))}`")
+                    policies = details.get('policies', [])
+                    st.write(f"- Policies: `{', '.join(policies) if policies else 'None'}`")
+                
+                # Debug information (remove after testing)
+                with st.expander("Debug Information"):
+                    st.json(details)
                 
                 # Confirmation buttons
                 col1, col2, col3 = st.columns([1, 1, 2])
