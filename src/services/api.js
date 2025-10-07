@@ -201,116 +201,28 @@ export const MoveProxy = async (proxyData) => {
   }
 };
 
-// ---------------------------
-// GitLab (backend) endpoints
-// ---------------------------
-
+//move proxies api
 /**
- * Push Apigee proxy bundle to GitLab (backend orchestrated)
- * @param {Object} payload { apigeeOrg, apigeeToken, proxyName, revision, gitlabToken, gitlabGroupName, gitRef }
+ * Clone a product from one organization to another
+ * @param {Object} gitdata - Proxy data to clone
+ * @returns {Promise<Object>} API response
  */
-export const gitlabPushProxy = async (payload) => {
-  const response = await fetch(`${API_URL}/gitlab/push-proxy`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.message || 'Failed to push proxy to GitLab');
-  return data;
-};
+export const pushProxyToGitlab = async (gitdata) => {
+  try{
+  const response = await fetch(`${API_URL}/git/lab`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(gitdata),
+    });
+    const resdata = await response.json();
 
-/**
- * Create a GitLab project (backend handled)
- * @param {Object} payload { gitlabToken, name, groupName }
- */
-export const gitlabCreateProject = async (payload) => {
-  const response = await fetch(`${API_URL}/gitlab/projects`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.message || 'Failed to create GitLab project');
-  return data;
-};
+      if (!response.ok) {
+        throw new Error(resdata.message || 'Failed to clone proxy');
+      }
 
-/**
- * Create a branch in a project (backend handled)
- * @param {string|number} projectId
- * @param {Object} payload { gitlabToken, branch, ref }
- */
-export const gitlabCreateBranch = async (projectId, payload) => {
-  const response = await fetch(`${API_URL}/gitlab/projects/${encodeURIComponent(projectId)}/branches`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.message || 'Failed to create branch');
-  return data;
-};
-
-/**
- * Get repository tree (backend handled)
- * @param {string|number} projectId
- * @param {Object} query { ref, path }
- */
-export const gitlabGetTree = async (projectId, query = {}) => {
-  const params = new URLSearchParams();
-  if (query.ref) params.set('ref', query.ref);
-  if (query.path) params.set('path', query.path);
-  const response = await fetch(`${API_URL}/gitlab/projects/${encodeURIComponent(projectId)}/tree?${params.toString()}`);
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.message || 'Failed to fetch tree');
-  return data;
-};
-
-/**
- * Get raw file (backend handled)
- * @param {string|number} projectId
- * @param {Object} query { path, ref }
- */
-export const gitlabGetRawFile = async (projectId, query) => {
-  const params = new URLSearchParams();
-  if (query?.path) params.set('path', query.path);
-  if (query?.ref) params.set('ref', query.ref);
-  const response = await fetch(`${API_URL}/gitlab/projects/${encodeURIComponent(projectId)}/files/raw?${params.toString()}`);
-  if (!response.ok) {
-    const data = await response.json().catch(() => ({}));
-    throw new Error(data.message || 'Failed to fetch file');
+      return resdata;
+  } catch (error) {
+    console.error('Error cloning proxy:', error);
+    throw error;
   }
-  return await response.text();
-};
-
-/**
- * Get archive (backend handled) - returns Blob-like via arrayBuffer here
- * @param {string|number} projectId
- * @param {Object} query { sha }
- */
-export const gitlabGetArchive = async (projectId, query = {}) => {
-  const params = new URLSearchParams();
-  if (query.sha) params.set('sha', query.sha);
-  const response = await fetch(`${API_URL}/gitlab/projects/${encodeURIComponent(projectId)}/archive?${params.toString()}`);
-  if (!response.ok) {
-    const data = await response.json().catch(() => ({}));
-    throw new Error(data.message || 'Failed to fetch archive');
-  }
-  return await response.arrayBuffer();
-};
-
-/**
- * Create or update a file (backend handled)
- * @param {string|number} projectId
- * @param {Object} payload { gitlabToken, path, content, commitMessage, branch, method }
- */
-export const gitlabUpsertFile = async (projectId, payload) => {
-  const response = await fetch(`${API_URL}/gitlab/projects/${encodeURIComponent(projectId)}/files`, {
-    method: (payload?.method || 'POST'),
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.message || 'Failed to upsert file');
-  return data;
 };
