@@ -200,163 +200,64 @@ class ApigeeTemplates:
     
     @staticmethod
     def generate_javascript_code(transformation_intent: str) -> str:
-        """Generate JavaScript code using ES3/ES5 syntax for Apigee Rhino engine"""
+        """Generate JavaScript code using ES5 syntax (real Apigee working version)"""
         
         intent_lower = transformation_intent.lower()
         
         # Pattern matching for common transformations
         if any(word in intent_lower for word in ["combine", "firstname", "lastname", "fullname"]):
-            return '''// Combine firstName and lastName into fullName - Apigee Rhino Engine Compatible
-// Using ES3/ES5 syntax without return statements
+            return '''// Combine firstName and lastName into fullName - ES5 Apigee syntax
 try {
     var responseContent = context.getVariable('response.content');
     
-    if (responseContent) {
-        var data = JSON.parse(responseContent);
-        
-        // Combine firstName and lastName if both exist
-        if (data.firstName && data.lastName) {
-            data.fullName = data.firstName + ' ' + data.lastName;
-        }
-        
-        // Add processing metadata
-        data.processedAt = new Date().toISOString();
-        data.processedBy = 'Apigee-JavaScript';
-        
-        // Set the modified response back
-        context.setVariable('response.content', JSON.stringify(data));
-        context.setVariable('transformation.status', 'success');
-        
-        print('Transformation completed: firstName + lastName -> fullName');
-    } else {
+    if (!responseContent) {
         context.setVariable('transformation.error', 'No response content available');
-        print('Error: No response content available');
+        return;
     }
     
+    var data = JSON.parse(responseContent);
+    
+    // Combine firstName and lastName if both exist
+    if (data.firstName && data.lastName) {
+        data.fullName = data.firstName + ' ' + data.lastName;
+    }
+    
+    // Add processing metadata
+    data.processedAt = new Date().toISOString();
+    data.processedBy = 'Apigee-JavaScript';
+    
+    context.setVariable('response.content', JSON.stringify(data));
+    print('Transformation completed: firstName + lastName -> fullName');
+    
 } catch (error) {
-    context.setVariable('transformation.error', 'JavaScript error: ' + error.message);
+    context.setVariable('transformation.error', error.message);
     print('Transformation error: ' + error.message);
-}'''
-        
-        elif any(word in intent_lower for word in ["filter", "remove", "exclude"]):
-            return '''// Filter and remove specified fields - Apigee Compatible
-// Using ES3/ES5 syntax for Apigee Rhino engine
-try {
-    var responseContent = context.getVariable('response.content');
-    
-    if (responseContent) {
-        var data = JSON.parse(responseContent);
-        
-        // Example: Remove sensitive fields
-        if (data.password) {
-            delete data.password;
-        }
-        if (data.ssn) {
-            delete data.ssn;
-        }
-        
-        // Add processing metadata
-        data.processedAt = new Date().toISOString();
-        data.filteredBy = 'Apigee-JavaScript';
-        
-        context.setVariable('response.content', JSON.stringify(data));
-        context.setVariable('transformation.status', 'filtered');
-        
-        print('Data filtering completed');
-    } else {
-        context.setVariable('transformation.error', 'No response content available');
-        print('Error: No response content available');
-    }
-    
-} catch (error) {
-    context.setVariable('transformation.error', 'JavaScript error: ' + error.message);
-    print('Filtering error: ' + error.message);
-}'''
-        
-        elif any(word in intent_lower for word in ["format", "date", "timestamp"]):
-            return '''// Format dates and timestamps - Apigee Compatible
-// Using ES3/ES5 syntax for Apigee Rhino engine
-try {
-    var responseContent = context.getVariable('response.content');
-    
-    if (responseContent) {
-        var data = JSON.parse(responseContent);
-        
-        // Format timestamp fields
-        if (data.created_at) {
-            var date = new Date(data.created_at);
-            data.formatted_date = date.toDateString();
-            data.formatted_time = date.toTimeString();
-        }
-        
-        // Add current timestamp
-        data.processedAt = new Date().toISOString();
-        data.serverTime = new Date().getTime();
-        
-        context.setVariable('response.content', JSON.stringify(data));
-        context.setVariable('transformation.status', 'formatted');
-        
-        print('Date formatting completed');
-    } else {
-        context.setVariable('transformation.error', 'No response content available');
-        print('Error: No response content available');
-    }
-    
-} catch (error) {
-    context.setVariable('transformation.error', 'JavaScript error: ' + error.message);
-    print('Formatting error: ' + error.message);
 }'''
         
         else:
-            # Generic template using ES3/ES5 - NO RETURN STATEMENTS
+            # Generic template using ES5
             return f'''// Custom transformation: {transformation_intent}
-// Using ES3/ES5 JavaScript syntax for Apigee Rhino engine
-// NOTE: No return statements allowed in global scope
+// Using ES5 JavaScript syntax (Apigee Rhino engine)
 try {{
     var responseContent = context.getVariable('response.content');
     
-    if (responseContent) {{
-        var data = JSON.parse(responseContent);
-        
-        // TODO: Implement custom transformation logic for: {transformation_intent}
-        // Example transformations (modify as needed):
-        
-        // Add custom fields
-        data.transformed = true;
-        data.transformationType = '{transformation_intent}';
-        data.processedAt = new Date().toISOString();
-        data.apiVersion = 'v1.0';
-        
-        // Example: Convert strings to uppercase (if needed)
-        // if (data.name) {{
-        //     data.name = data.name.toString().toUpperCase();
-        // }}
-        
-        // Example: Add calculated fields
-        // if (data.price && data.quantity) {{
-        //     data.total = parseFloat(data.price) * parseInt(data.quantity);
-        // }}
-        
-        // Set the modified response back to context
-        context.setVariable('response.content', JSON.stringify(data));
-        context.setVariable('transformation.status', 'success');
-        
-        print('Custom transformation completed: {transformation_intent}');
-        
-    }} else {{
+    if (!responseContent) {{
         context.setVariable('transformation.error', 'No response content available');
-        print('Error: No response content available');
+        return;
     }}
     
+    var data = JSON.parse(responseContent);
+    
+    // TODO: Implement transformation logic for: {transformation_intent}
+    // Add transformation marker
+    data.transformed = true;
+    data.transformationType = '{transformation_intent}';
+    data.processedAt = new Date().toISOString();
+    
+    context.setVariable('response.content', JSON.stringify(data));
+    print('Custom transformation completed: {transformation_intent}');
+    
 }} catch (error) {{
-    context.setVariable('transformation.error', 'JavaScript error: ' + error.message);
+    context.setVariable('transformation.error', error.message);
     print('Transformation error: ' + error.message);
-}}
-
-// Apigee JavaScript Policy Notes:
-// 1. Use var for all variable declarations
-// 2. No return statements in global scope
-// 3. Use context.setVariable() to set values
-// 4. Use print() for logging
-// 5. Always wrap in try-catch blocks
-// 6. Access response content via context.getVariable('response.content')'''
+}}'''
