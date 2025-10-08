@@ -226,3 +226,31 @@ export const pushProxyToGitlab = async (gitdata) => {
     throw error;
   }
 };
+
+/**
+ * Check if a proxy exists in Apigee organization
+ * @param {string} orgId - Organization ID
+ * @param {string} proxyName - Proxy name
+ * @param {string} token - Authentication token
+ * @returns {Promise<Object>} API response
+ */
+export const checkProxyExists = async (orgId, proxyName, token) => {
+  try {
+    const response = await fetch(`${API_URL}/git/check-proxy`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ orgId, proxyName, token }),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to check proxy');
+    }
+    return data;
+  } catch (error) {
+    console.error('Error checking proxy:', error);
+    throw error;
+  }
+};
