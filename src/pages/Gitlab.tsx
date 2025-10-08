@@ -29,11 +29,7 @@ const Gitlab: React.FC = () => {
   const [proxyCheckStatus, setProxyCheckStatus] = useState<'idle' | 'checking' | 'found' | 'not_found' | 'error' | 'unknown'>('idle');
   const [availableRevisions, setAvailableRevisions] = useState<string[]>([]);
   const [deploymentInfo, setDeploymentInfo] = useState<{environment: string, status: string}[]>([]);
-  const [selectedEnvironments, setSelectedEnvironments] = useState<string[]>(['dev', 'uat-public', 'uat-internal']);
-  const [gitlabTokenStatus, setGitlabTokenStatus] = useState<'idle' | 'checking' | 'connected' | 'failed'>('idle');
-  const [apigeeTokenStatus, setApigeeTokenStatus] = useState<'idle' | 'checking' | 'connected' | 'failed'>('idle');
-  const [gitlabUsername, setGitlabUsername] = useState<string>('');
-  const [apigeeUsername, setApigeeUsername] = useState<string>('');
+  const [selectedEnvironments, setSelectedEnvironments] = useState<string[]>(['dev', 'uat-public', 'prod-public']);
   const [buttonAnimationPhase, setButtonAnimationPhase] = useState<'idle' | 'phase1' | 'phase2' | 'phase3'>('idle');
   const [showSuccessCard, setShowSuccessCard] = useState(false);
   const [gitlabProjectUrl, setGitlabProjectUrl] = useState('');
@@ -60,15 +56,6 @@ const Gitlab: React.FC = () => {
       [name]: value,
     }));
 
-    // Reset token status when token changes
-    if (name === 'gitlabAccessToken') {
-      setGitlabTokenStatus('idle');
-      setGitlabUsername('');
-    }
-    if (name === 'apigeeToken') {
-      setApigeeTokenStatus('idle');
-      setApigeeUsername('');
-    }
   };
 
   const onPushProxyToGitlab = async () => {
@@ -102,6 +89,7 @@ const Gitlab: React.FC = () => {
         proxyName: formData.proxyName,
         revision: formData.revision,
         gitToken: formData.gitlabAccessToken,
+        gitlabGroupName: formData.gitlabGroupName,
         branch: selectedBranch || 'master',
         template: formData.template,
         environments: selectedEnvironments,
@@ -118,7 +106,8 @@ const Gitlab: React.FC = () => {
       setTimeout(() => {
         setButtonAnimationPhase('phase3');
         setShowSuccessCard(true);
-        setGitlabProjectUrl(`https://gitlab.com/${formData.gitlabGroupName}/${formData.proxyName}`);
+        // Use GitLab project URL from backend response
+        setGitlabProjectUrl(response.data?.gitlabProjectUrl || `https://gitlab.com/${formData.gitlabGroupName}/${formData.proxyName}`);
       }, 1000);
       
     } catch (e: any) {
@@ -129,33 +118,7 @@ const Gitlab: React.FC = () => {
     }
   };
 
-  const validateGitlabToken = async () => {
-    if (!formData.gitlabAccessToken) return;
-    
-    setGitlabTokenStatus('checking');
-    try {
-      // Mock validation - replace with real API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      setGitlabTokenStatus('connected');
-      setGitlabUsername('gitlab-user');
-    } catch (error) {
-      setGitlabTokenStatus('failed');
-    }
-  };
-
-  const validateApigeeToken = async () => {
-    if (!formData.apigeeToken || !apigeeOrg) return;
-    
-    setApigeeTokenStatus('checking');
-    try {
-      // Mock validation - replace with real API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      setApigeeTokenStatus('connected');
-      setApigeeUsername('apigee-user');
-    } catch (error) {
-      setApigeeTokenStatus('failed');
-    }
-  };
+  // Token validation was previously mocked; removed per product requirements.
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -254,26 +217,7 @@ const Gitlab: React.FC = () => {
                       placeholder="Enter GitLab personal access token" 
                       value={formData.gitlabAccessToken} 
                       onChange={handleChange}
-                      onBlur={validateGitlabToken}
                     />
-                    {gitlabTokenStatus === 'checking' && (
-                      <div className="flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm w-fit">
-                        <span>🔄</span>
-                        <span>Verifying connection...</span>
-                      </div>
-                    )}
-                    {gitlabTokenStatus === 'connected' && (
-                      <div className="flex items-center gap-2 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm w-fit">
-                        <span>✓</span>
-                        <span>Connected as {gitlabUsername}</span>
-                      </div>
-                    )}
-                    {gitlabTokenStatus === 'failed' && (
-                      <div className="flex items-center gap-2 px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm w-fit">
-                        <span>✗</span>
-                        <span>Connection failed</span>
-                      </div>
-                    )}
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700">Group Name *</label>
@@ -394,26 +338,7 @@ const Gitlab: React.FC = () => {
                       placeholder="Enter Apigee token" 
                       value={formData.apigeeToken} 
                       onChange={handleChange}
-                      onBlur={validateApigeeToken}
                     />
-                    {apigeeTokenStatus === 'checking' && (
-                      <div className="flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm w-fit">
-                        <span>🔄</span>
-                        <span>Verifying connection...</span>
-                      </div>
-                    )}
-                    {apigeeTokenStatus === 'connected' && (
-                      <div className="flex items-center gap-2 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm w-fit">
-                        <span>✓</span>
-                        <span>Connected as {apigeeUsername}</span>
-                      </div>
-                    )}
-                    {apigeeTokenStatus === 'failed' && (
-                      <div className="flex items-center gap-2 px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm w-fit">
-                        <span>✗</span>
-                        <span>Connection failed</span>
-                      </div>
-                    )}
                   </div>
                 </div>
 
