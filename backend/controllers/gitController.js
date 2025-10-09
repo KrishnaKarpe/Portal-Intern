@@ -49,6 +49,8 @@ const gitProxy = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: `Proxy ${proxyName} sent successfully`,
+      username: gitResult.username,
+      projectUrl: gitResult.gitlabProjectUrl,
       data: gitResult
     });
 

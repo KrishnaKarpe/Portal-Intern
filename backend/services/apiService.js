@@ -383,11 +383,22 @@ const createGitlabProject = async (proxyName, token) => {
  * @param {string} token - GitLab access token
  * @param {Buffer} proxyBundle - Proxy bundle binary (zip)
  * @param {string} branch - Target branch (default: 'main')
- * @returns {Promise<Object>} - Upload response
+ * @param {string} username - GitLab username (optional; fetched if not provided)
+ * @returns {Promise<Object>} - Upload response { success, projectId, username, gitlabProjectUrl }
  */
 const sendProxyToGitlab = async (proxyName, token, proxyBundle, branch = 'main') => {
   try {
     console.log(`🔍 Checking for GitLab project: ${proxyName}`);
+
+    // Determine username (use provided, else try to fetch, else fallback 'unknown')
+    let usernameToUse;
+    try {
+      usernameToUse = await getGitUser(token);
+    } catch (err) {
+    console.warn('Could not fetch GitLab user, proceeding with "unknown"');
+      usernameToUse = 'unknown';
+    }
+
 
     // Step 1: Get or create project
     let projectId;
@@ -398,19 +409,30 @@ const sendProxyToGitlab = async (proxyName, token, proxyBundle, branch = 'main')
       console.log(`🚀 Creating new GitLab project: ${proxyName}`);
       projectId = await createGitlabProject(proxyName, token);
 
-      // Initialize repo with README
+      // Initialize repo with README (include username in commit message)
       await axios.post(
         `https://gitlab.com/api/v4/projects/${projectId}/repository/files/README.md`,
         {
           branch: 'main',
           content: `# ${proxyName}\nInitial commit`,
-          commit_message: 'Initial commit',
+          commit_message: `Initial commit by ${usernameToUse}`,
         },
         { headers: { 'PRIVATE-TOKEN': token } }
       );
     }
 
-    // Step 2: Ensure branch exists
+    // Fetch project info (to return web_url)
+    let gitlabProjectUrl = undefined;
+    try {
+      const projResp = await axios.get(`https://gitlab.com/api/v4/projects/${projectId}`, {
+        headers: { 'PRIVATE-TOKEN': token }
+      });
+      gitlabProjectUrl = projResp.data.web_url;
+    } catch (err) {
+      console.warn('Could not fetch project info to get web_url:', err.message || err);
+    }
+
+    // Step 2: Ensure branch exists (create from main if needed)
     try {
       await axios.post(
         `https://gitlab.com/api/v4/projects/${projectId}/repository/branches`,
@@ -418,7 +440,7 @@ const sendProxyToGitlab = async (proxyName, token, proxyBundle, branch = 'main')
         { headers: { 'PRIVATE-TOKEN': token } }
       );
     } catch {
-      console.log(`⚠️ Branch '${branch}' already exists, continuing...`);
+      console.log(`⚠️ Branch '${branch}' may already exist, continuing...`);
     }
 
     // Step 3: Unzip bundle in memory
@@ -431,47 +453,65 @@ const sendProxyToGitlab = async (proxyName, token, proxyBundle, branch = 'main')
       if (entry.isDirectory) continue;
 
       const repoPath = entry.entryName.replace(/\\/g, '/');
+      // IMPORTANT: encode path fully (encodeURIComponent keeps %2F for nested paths)
       const fileUrl = `https://gitlab.com/api/v4/projects/${projectId}/repository/files/${encodeURIComponent(repoPath)}`;
       const content = entry.getData().toString('base64');
 
       try {
-        // Try creating file
+        // Try creating file (POST)
         await axios.post(
           fileUrl,
           {
             branch,
             content,
-            commit_message: `Upload ${repoPath}`,
+            commit_message: `Upload ${repoPath} by ${usernameToUse}`,
             encoding: 'base64',
           },
           { headers: { 'PRIVATE-TOKEN': token } }
         );
       } catch (err) {
-        // Update if file exists
+        // If file exists, GitLab returns 400 for create -> update with PUT
         if (err.response?.status === 400) {
           await axios.put(
             fileUrl,
             {
               branch,
               content,
-              commit_message: `Update ${repoPath}`,
+              commit_message: `Update ${repoPath} by ${usernameToUse}`,
               encoding: 'base64',
             },
             { headers: { 'PRIVATE-TOKEN': token } }
           );
-        } else throw err;
+        } else {
+          // rethrow other errors
+          throw err;
+        }
       }
 
       console.log(`📤 Uploaded: ${repoPath}`);
     }
 
     console.log(`✅ Proxy bundle uploaded successfully to ${proxyName}`);
-    return { success: true, projectId };
+    return { success: true, projectId, username: usernameToUse, gitlabProjectUrl };
   } catch (error) {
     console.error('❌ Error uploading proxy:', error.response?.data || error.message);
     throw error;
   }
 };
+
+const getGitUser = async (token) => {
+  try {
+    console.log(`Looking for git user`);
+    const response = await axios.get('https://gitlab.com/api/v4/user', {
+      headers: { 'PRIVATE-TOKEN': token },
+    });
+    console.log(`Found git user: ${response.data.username}`);
+    return response.data.username;
+  } catch (error) {
+    console.error('Error fetching git user:', error.response?.data || error.message);
+    throw error;
+  } 
+}; 
 
 // Export functions with clear naming
 module.exports = {
@@ -485,6 +525,7 @@ module.exports = {
   createGitlabProject,
   getGitlabProjectId,
   fetchLatestRevision,
+  getGitUser,
 
 
 };

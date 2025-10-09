@@ -105,6 +105,11 @@ const Gitlab: React.FC = () => {
       // Phase 2: Success state (300ms)
       setButtonAnimationPhase('phase2');
       
+      const gitUsername = response.username;
+      const gitUrl = response.projectUrl;
+
+      console.log('GitLab username:', gitUsername);
+      console.log('GitLab project URL:', gitUrl);
       // Phase 3: Result Display (1000ms+)
       setTimeout(() => {
         setButtonAnimationPhase('phase3');
