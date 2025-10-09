@@ -41,7 +41,7 @@ const Gitlab: React.FC = () => {
   const [formData, setFormData] = useState({
     gitlabGroupName: '',
     gitlabAccessToken: '',
-    gitRef: 'master',
+    gitRef: '',
     customGitRef: '',
     template: 'apigee-cicd',
     apigeeToken: '',
@@ -72,7 +72,7 @@ const Gitlab: React.FC = () => {
       return;
     }
     if (formData.gitRef === 'other' && !formData.customGitRef) {
-      toast.error('Provide a branch/tag name');
+      toast.error('Provide a branch name');
       return;
     }
     try {
@@ -82,7 +82,7 @@ const Gitlab: React.FC = () => {
       setButtonAnimationPhase('phase1');
       
       // Simulate backend operation
-      const selectedBranch = formData.gitRef === 'other' ? formData.customGitRef : formData.gitRef;
+      const selectedBranch = formData.gitRef;
       const payload = {
         sourceOrg: apigeeOrg,
         sourceToken: formData.apigeeToken,
@@ -90,7 +90,7 @@ const Gitlab: React.FC = () => {
         revision: formData.revision,
         gitToken: formData.gitlabAccessToken,
         gitlabGroupName: formData.gitlabGroupName,
-        branch: selectedBranch || 'master',
+        branch: selectedBranch ,
         template: formData.template,
         environments: selectedEnvironments,
       };
@@ -201,110 +201,6 @@ const Gitlab: React.FC = () => {
 
           <CardContent className="p-6">
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* GitLab Target */}
-              <div className="space-y-4 p-4 rounded-lg" style={{backgroundColor: '#FFF5F0', border: '1px solid #FC6D26'}}>
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="w-3 h-3 rounded-full" style={{backgroundColor: '#FC6D26'}}></div>
-                  <h3 className="text-lg font-semibold" style={{color: '#FC6D26'}}>GitLab Target</h3>
-                </div>
-                {/* Row 1: Access Token + Group Name */}
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">GitLab Access Token *</label>
-                    <Input 
-                      name="gitlabAccessToken" 
-                      type="password" 
-                      placeholder="Enter GitLab personal access token" 
-                      value={formData.gitlabAccessToken} 
-                      onChange={handleChange}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Group Name *</label>
-                    <Input name="gitlabGroupName" placeholder="e.g. apigee-proxies" value={formData.gitlabGroupName} onChange={handleChange} />
-                  </div>
-                </div>
-
-                {/* Row 2: Branch/Tag + Template */}
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Branch/Tag</label>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1">
-                        <Select
-                          value={formData.gitRef}
-                          onValueChange={(value) => setFormData((prev) => ({ ...prev, gitRef: value }))}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select branch or tag" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="master">master</SelectItem>
-                            <SelectItem value="main">main</SelectItem>
-                            <SelectItem value="other">Other…</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      {formData.gitRef === 'other' && (
-                        <div className="flex-1">
-                          <Input
-                            name="customGitRef"
-                            placeholder="Enter branch or tag"
-                            value={formData.customGitRef}
-                            onChange={handleChange}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Template</label>
-                    <Select
-                      value={formData.template}
-                      onValueChange={(value) => setFormData((prev) => ({ ...prev, template: value }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select template" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="apigee-cicd">Apigee CI/CD</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                {/* Environment Selection */}
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">GitLab Environments</label>
-                    <div className="grid gap-3 md:grid-cols-3">
-                      {['dev', 'uat-public', 'uat-internal'].map((env) => (
-                        <div key={env} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={env}
-                            checked={selectedEnvironments.includes(env)}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                setSelectedEnvironments(prev => [...prev, env]);
-                              } else {
-                                setSelectedEnvironments(prev => prev.filter(e => e !== env));
-                              }
-                            }}
-                          />
-                          <label
-                            htmlFor={env}
-                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                          >
-                            {env}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                    <p className="text-xs text-gray-500">Select environments to deploy to GitLab</p>
-                  </div>
-                </div>
-              </div>
-
               {/* Apigee Source */}
               <div className="space-y-4 p-4 rounded-lg" style={{backgroundColor: '#E8F0FE', border: '1px solid #4285F4'}}>
                 <div className="flex items-center gap-2 mb-4">
@@ -351,7 +247,7 @@ const Gitlab: React.FC = () => {
                         onValueChange={(value) => setFormData((prev) => ({ ...prev, revision: value }))}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Select revision" />
+                          <SelectValue placeholder="Press Fetch to get the latest revision." />
                         </SelectTrigger>
                         <SelectContent>
                           {availableRevisions.map((revision) => (
@@ -362,7 +258,7 @@ const Gitlab: React.FC = () => {
                         </SelectContent>
                       </Select>
                     ) : (
-                      <Input name="revision" placeholder="e.g. 5" value={formData.revision} onChange={handleChange} />
+                      <Input name="revision" placeholder="Press Fetch to get the latest revision." value={formData.revision} onChange={handleChange} />
                     )}
                   </div>
                   <div className="space-y-2">
@@ -444,6 +340,100 @@ const Gitlab: React.FC = () => {
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* GitLab Target */}
+              <div className="space-y-4 p-4 rounded-lg" style={{backgroundColor: '#FFF5F0', border: '1px solid #FC6D26'}}>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-3 h-3 rounded-full" style={{backgroundColor: '#FC6D26'}}></div>
+                  <h3 className="text-lg font-semibold" style={{color: '#FC6D26'}}>GitLab Target</h3>
+                </div>
+                {/* Row 1: Access Token + Group Name */}
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">GitLab Access Token *</label>
+                    <Input 
+                      name="gitlabAccessToken" 
+                      type="password" 
+                      placeholder="Enter GitLab personal access token" 
+                      value={formData.gitlabAccessToken} 
+                      onChange={handleChange}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">Group Name *</label>
+                    <Input name="gitlabGroupName" placeholder="e.g. apigee-proxies" value={formData.gitlabGroupName} onChange={handleChange} />
+                  </div>
+                </div>
+
+                {/* Row 2: Branch + Template */}
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">Branch</label>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1">
+                        <Select
+                          value={formData.gitRef}
+                          onValueChange={(value) => setFormData((prev) => ({ ...prev, gitRef: value }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select branch or tag" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="master">dev</SelectItem>
+                            <SelectItem value="main">uat-public</SelectItem>
+                            <SelectItem value="other">prod-public</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">Template</label>
+                    <Select
+                      value={formData.template}
+                      onValueChange={(value) => setFormData((prev) => ({ ...prev, template: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select template" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="apigee-cicd">Apigee CI/CD</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Environment Selection */}
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">GitLab Environments</label>
+                    <div className="grid gap-3 md:grid-cols-3">
+                      {['dev', 'uat-public', 'prod-public'].map((env) => (
+                        <div key={env} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={env}
+                            checked={selectedEnvironments.includes(env)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedEnvironments(prev => [...prev, env]);
+                              } else {
+                                setSelectedEnvironments(prev => prev.filter(e => e !== env));
+                              }
+                            }}
+                          />
+                          <label
+                            htmlFor={env}
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                          >
+                            {env}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-xs text-gray-500">Select environments to create for new project in GitLab</p>
+                  </div>
+                </div>
               </div>
 
               {/* Single Action */}
