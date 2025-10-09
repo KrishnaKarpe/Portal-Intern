@@ -227,30 +227,26 @@ export const pushProxyToGitlab = async (gitdata) => {
   }
 };
 
+
+//to get latest revision
 /**
- * Check if a proxy exists in Apigee organization
- * @param {string} orgId - Organization ID
- * @param {string} proxyName - Proxy name
- * @param {string} token - Authentication token
- * @returns {Promise<Object>} API response
+ * Fetch the latest revision number of a proxy in the source organization
+ * @param {Object} payload - { sourceOrg, proxyName, sourceToken }
+ * @returns {Promise<number>} Latest revision number
  */
-export const checkProxyExists = async (orgId, proxyName, token) => {
+export const fetchLatestRevision = async (payload) => {
   try {
-    const response = await fetch(`${API_URL}/git/check-proxy`, {
+    const response = await fetch(`${API_URL}/git/latest-revision`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ orgId, proxyName, token }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
     });
 
     const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.message || 'Failed to check proxy');
-    }
-    return data;
+    if (!response.ok) throw new Error(data.message || 'Failed to fetch latest revision. Check if proxy exists and correct name is provided');
+    return data.latestRevision;
   } catch (error) {
-    console.error('Error checking proxy:', error);
+    console.error('Error fetching latest revision:', error);
     throw error;
   }
 };

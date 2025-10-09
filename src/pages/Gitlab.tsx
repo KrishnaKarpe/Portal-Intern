@@ -14,7 +14,10 @@ import {
   ArrowRight,
 } from 'lucide-react';
 
-import { pushProxyToGitlab, checkProxyExists } from '@/services/api';
+import { 
+  pushProxyToGitlab,
+  fetchLatestRevision,
+ } from '@/services/api';
 
 // Static options for Apigee orgs; adjust as needed
 const organizations = [
@@ -125,45 +128,28 @@ const Gitlab: React.FC = () => {
     toast.success('Configuration saved');
   };
 
-  const onFetchProxyMeta = async () => {
-    if (!apigeeOrg) {
-      toast.error('Select Apigee organization');
-      return;
-    }
-    if (!formData.apigeeToken) {
-      toast.error('Provide Apigee token');
-      return;
-    }
-    if (!formData.proxyName) {
-      toast.error('Enter proxy name');
-      return;
-    }
-    try {
-      setIsFetching(true);
-      setProxyCheckStatus('checking');
-      
-      const response = await checkProxyExists(apigeeOrg, formData.proxyName, formData.apigeeToken);
-      
-      if (response.exists) {
-        setProxyCheckStatus('found');
-        // Use real data from backend
-        setAvailableRevisions(response.revisions || []);
-        setDeploymentInfo(response.deployments || []);
-        toast.success(`Proxy ${formData.proxyName} found in ${apigeeOrg}`);
-      } else {
-        setProxyCheckStatus('not_found');
-        setAvailableRevisions([]);
-        setDeploymentInfo([]);
-        toast.error(`Proxy ${formData.proxyName} not found in ${apigeeOrg}`);
-      }
-    } catch (e: any) {
-      console.error('Proxy check error:', e);
-      setProxyCheckStatus('error');
-      toast.error(e?.message || 'Failed to check proxy existence');
-    } finally {
-      setIsFetching(false);
-    }
-  };
+  const onFetchLatestRevision = async () => {
+  if (!apigeeOrg || !formData.apigeeToken || !formData.proxyName) {
+    toast.error('Provide Apigee org, token, and proxy name first');
+    return;
+  }
+
+  try {
+    setIsLoading(true);
+    const latestRevision = await fetchLatestRevision({
+      sourceOrg: apigeeOrg,
+      proxyName: formData.proxyName,
+      sourceToken: formData.apigeeToken,
+    });
+    setFormData((prev) => ({ ...prev, revision: latestRevision.toString() }));
+    toast.success(`Latest revision fetched: ${latestRevision}`);
+  } catch (error: any) {
+    toast.error(error.message || 'Failed to fetch latest revision');
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -268,7 +254,7 @@ const Gitlab: React.FC = () => {
                       <Button
                         type="button"
                         size="sm"
-                        onClick={onFetchProxyMeta}
+                        onClick={onFetchLatestRevision}
                         disabled={isFetching}
                         className="bg-blue-300 text-blue-900 hover:bg-blue-400 active:bg-blue-500 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-400"
                       >

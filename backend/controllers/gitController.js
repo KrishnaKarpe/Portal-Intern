@@ -1,6 +1,7 @@
 const {
   fetchProxyFromOrg,    
-  sendProxyToGitlab
+  sendProxyToGitlab,
+  fetchLatestRevision,
 } = require('../services/apiService');
 
 
@@ -64,8 +65,33 @@ const gitProxy = async (req, res) => {
   }
 };
 
+/**
+ * Get the latest revision number of a proxy in the source organization
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+const getLatestRevision = async (req, res) => {
+  const { sourceOrg, proxyName, sourceToken } = req.body;
+
+  try {
+    const latestRevision = await fetchLatestRevision(sourceOrg, proxyName, sourceToken);
+    res.status(200).json({
+      success: true,
+      latestRevision
+    });
+  } catch (error) {
+    res.status(error.status || 500).json({
+      success: false,
+      message: error.message,
+      details: error.details || null
+    });
+  }
+};
+
+
 
 
 module.exports = {
-  gitProxy
+  gitProxy,
+  getLatestRevision,
 };
