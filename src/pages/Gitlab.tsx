@@ -371,9 +371,9 @@ const Gitlab: React.FC = () => {
                             <SelectValue placeholder="Select branch or tag" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="master">dev</SelectItem>
-                            <SelectItem value="main">uat-public</SelectItem>
-                            <SelectItem value="other">prod-public</SelectItem>
+                            <SelectItem value="dev">dev</SelectItem>
+                            <SelectItem value="uat-public">uat-public</SelectItem>
+                            <SelectItem value="prod-public">prod-public</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>

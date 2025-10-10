@@ -20,10 +20,12 @@ const gitProxy = async (req, res) => {
       proxyName,
       revision,
       gitToken,
-      branch
+      branch,
+      template,
+      environments
     } = req.body;
 
-    if (!sourceOrg || !sourceToken || !proxyName || !revision || !gitToken || !branch) {
+    if (!sourceOrg || !sourceToken || !proxyName || !revision || !gitToken || !branch ) {
       return res.status(400).json({
         success: false,
         message: 'Missing required fields'
@@ -44,13 +46,14 @@ const gitProxy = async (req, res) => {
     
     // Step 2: Import proxy to git
     console.log('Step 2: importing proxy to git...');
-    const gitResult = await sendProxyToGitlab(proxyName, gitToken, proxyBundle, branch);
+    const gitResult = await sendProxyToGitlab(proxyName, gitToken, proxyBundle, branch, template, environments);
 
     return res.status(200).json({
       success: true,
       message: `Proxy ${proxyName} sent successfully`,
       username: gitResult.username,
       projectUrl: gitResult.gitlabProjectUrl,
+      branch: gitResult.branch,
       data: gitResult
     });
 
