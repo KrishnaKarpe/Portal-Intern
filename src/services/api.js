@@ -250,3 +250,22 @@ export const fetchLatestRevision = async (payload) => {
     throw error;
   }
 };
+
+// Fetch deployment status for a proxy
+// payload: { sourceOrg, proxyName, sourceToken }
+export const fetchDeploymentStatus = async (payload) => {
+  try {
+    const response = await fetch(`${API_URL}/git/deployments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Failed to fetch deployment status');
+    return data.deployments || [];
+  } catch (error) {
+    console.error('Error fetching deployment status:', error);
+    throw error;
+  }
+};

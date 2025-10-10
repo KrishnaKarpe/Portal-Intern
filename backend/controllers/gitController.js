@@ -2,6 +2,7 @@ const {
   fetchProxyFromOrg,    
   sendProxyToGitlab,
   fetchLatestRevision,
+  fetchProxyDeployments,
 } = require('../services/apiService');
 
 
@@ -93,10 +94,38 @@ const getLatestRevision = async (req, res) => {
   }
 };
 
+/**
+ * Get deployment status of a proxy in the source organization
+ * @param {Object} req
+ * @param {Object} res
+ */
+const getDeploymentStatus = async (req, res) => {
+  const { sourceOrg, proxyName, sourceToken } = req.body;
+
+  if (!sourceOrg || !proxyName || !sourceToken) {
+    return res.status(400).json({
+      success: false,
+      message: 'Missing required fields',
+    });
+  }
+
+  try {
+    const deployments = await fetchProxyDeployments(sourceOrg, proxyName, sourceToken);
+    return res.status(200).json({ success: true, deployments });
+  } catch (error) {
+    return res.status(error.status || 500).json({
+      success: false,
+      message: error.message || 'Failed to fetch deployment status',
+      details: error.details || null,
+    });
+  }
+};
+
 
 
 
 module.exports = {
   gitProxy,
   getLatestRevision,
+  getDeploymentStatus,
 };

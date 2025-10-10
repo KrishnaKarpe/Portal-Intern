@@ -321,11 +321,11 @@ const SendProxyToOrg = async (orgId, proxyName, token, proxyBundle) => {
     return createResponse.data;
   } catch (error) {
     console.error(`Error importing proxy ${proxyName}:`, error.message);
-
+    const statusCode = error.response?.status || 500;
+    const errorMessage = error.response?.data?.error?.message || error.message;
     const enhancedError = new Error(errorMessage);
     enhancedError.status = statusCode;
     enhancedError.details = error.response?.data;
-
     throw enhancedError;
   }
 };
@@ -567,19 +567,86 @@ const getGitUser = async (token) => {
   } 
 }; 
 
+<<<<<<< Updated upstream
 // Export functions
+=======
+// (exports moved to bottom)
+
+/**
+ * Fetch deployments for a proxy from Apigee API
+ * @param {string} orgId - Organization ID
+ * @param {string} proxyName - Proxy name
+ * @param {string} token - Authentication token
+ * @returns {Promise<Array<{environment: string, status: 'Deployed' | 'Not Deployed'}>>}
+ */
+const fetchProxyDeployments = async (orgId, proxyName, token) => {
+  console.log(`Fetching deployments for proxy ${proxyName} in org ${orgId}`);
+
+  if (!token || token.trim() === '') {
+    throw new Error('Authentication token is required');
+  }
+
+  try {
+    const response = await axios({
+      method: 'GET',
+      url: `https://apigee.googleapis.com/v1/organizations/${orgId}/apis/${proxyName}/deployments`,
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      timeout: 20000,
+    });
+
+    const data = response.data;
+    console.log('Apigee deployments raw response:', JSON.stringify(data, null, 2));
+
+    // Apigee response shape:
+    // {
+    //   deployments: [
+    //     {
+    //       environment: 'apim-dev',
+    //       revisions: [ { name: '8', state: 'deployed' | 'undeployed' | 'IN_PROGRESS', ... } ]
+    //     }
+    //   ]
+    // }
+
+    const deployments = [];
+    if (data && Array.isArray(data.deployments)) {
+      for (const item of data.deployments) {
+        const environment = item.environment || 'unknown';
+        // In your tenant, Apigee returns a flat list with 'revision' per environment (no state field)
+        // Treat presence of an entry with a revision as Deployed
+        const isDeployed = !!item.revision;
+        const status = isDeployed ? 'Deployed' : 'Not Deployed';
+        const revision = item.revision || null;
+        deployments.push({ environment, status, revision });
+      }
+    }
+
+    return deployments;
+  } catch (error) {
+    console.error(`Error fetching deployments for ${proxyName}:`, error.message);
+    const statusCode = error.response?.status || 500;
+    const errorMessage = error.response?.data?.error?.message || error.message;
+    const enhancedError = new Error(errorMessage);
+    enhancedError.status = statusCode;
+    enhancedError.details = error.response?.data;
+    throw enhancedError;
+  }
+};
+
+// Export functions with clear naming (placed after all definitions)
+>>>>>>> Stashed changes
 module.exports = {
   fetchProductFromOrg,
   fetchAllProductsFromOrg,
   modifyProductForClone,
   createProductInOrg,
-  fetchProxyFromOrg,                  
+  fetchProxyFromOrg,
   SendProxyToOrg,
   sendProxyToGitlab,
   createGitlabProject,
   getGitlabProjectId,
   fetchLatestRevision,
   getGitUser,
-
-
+  fetchProxyDeployments,
 };

@@ -17,6 +17,7 @@ import {
 import { 
   pushProxyToGitlab,
   fetchLatestRevision,
+  fetchDeploymentStatus,
  } from '@/services/api';
 
 // Static options for Apigee orgs; adjust as needed
@@ -31,11 +32,13 @@ const Gitlab: React.FC = () => {
   const [isFetching, setIsFetching] = useState(false);
   const [proxyCheckStatus, setProxyCheckStatus] = useState<'idle' | 'checking' | 'found' | 'not_found' | 'error' | 'unknown'>('idle');
   const [availableRevisions, setAvailableRevisions] = useState<string[]>([]);
-  const [deploymentInfo, setDeploymentInfo] = useState<{environment: string, status: string}[]>([]);
+  const [deploymentInfo, setDeploymentInfo] = useState<{environment: string, status: string, revision?: string}[]>([]);
   const [selectedEnvironments, setSelectedEnvironments] = useState<string[]>(['dev', 'uat-public', 'prod-public']);
   const [buttonAnimationPhase, setButtonAnimationPhase] = useState<'idle' | 'phase1' | 'phase2' | 'phase3'>('idle');
   const [showSuccessCard, setShowSuccessCard] = useState(false);
   const [gitlabProjectUrl, setGitlabProjectUrl] = useState('');
+  const [gitUsername, setGitUsername] = useState('');
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
 
   // Apigee selections
   const [apigeeOrg, setApigeeOrg] = useState("");
@@ -45,7 +48,6 @@ const Gitlab: React.FC = () => {
     gitlabGroupName: '',
     gitlabAccessToken: '',
     gitRef: '',
-    customGitRef: '',
     template: 'apigee-cicd',
     apigeeToken: '',
     proxyName: '',
@@ -72,10 +74,6 @@ const Gitlab: React.FC = () => {
     }
     if (!formData.gitlabAccessToken || !formData.gitlabGroupName) {
       toast.error('Provide GitLab token and group name');
-      return;
-    }
-    if (formData.gitRef === 'other' && !formData.customGitRef) {
-      toast.error('Provide a branch name');
       return;
     }
     try {
@@ -105,8 +103,9 @@ const Gitlab: React.FC = () => {
       // Phase 2: Success state (300ms)
       setButtonAnimationPhase('phase2');
       
-      const gitUsername = response.username;
+      const gitUsernameFromResponse = response.username;
       const gitUrl = response.projectUrl;
+      setGitUsername(gitUsernameFromResponse);
 
       console.log('GitLab username:', gitUsername);
       console.log('GitLab project URL:', gitUrl);
@@ -114,8 +113,8 @@ const Gitlab: React.FC = () => {
       setTimeout(() => {
         setButtonAnimationPhase('phase3');
         setShowSuccessCard(true);
-        // Use GitLab project URL from backend response
-        setGitlabProjectUrl(response.data?.gitlabProjectUrl || `https://gitlab.com/${formData.gitlabGroupName}/${formData.proxyName}`);
+        // Use GitLab project URL from backend response consistently
+        setGitlabProjectUrl(gitUrl);
       }, 1000);
       
     } catch (e: any) {
@@ -140,7 +139,7 @@ const Gitlab: React.FC = () => {
   }
 
   try {
-    setIsLoading(true);
+    setIsFetching(true);
     const latestRevision = await fetchLatestRevision({
       sourceOrg: apigeeOrg,
       proxyName: formData.proxyName,
@@ -151,9 +150,37 @@ const Gitlab: React.FC = () => {
   } catch (error: any) {
     toast.error(error.message || 'Failed to fetch latest revision');
   } finally {
-    setIsLoading(false);
+    setIsFetching(false);
   }
 };
+
+  const onFetchDeploymentStatus = async () => {
+    if (!apigeeOrg || !formData.apigeeToken || !formData.proxyName) {
+      toast.error('Provide Apigee org, token, and proxy name first');
+      return;
+    }
+
+    try {
+      setIsCheckingStatus(true);
+      const deployments = await fetchDeploymentStatus({
+        sourceOrg: apigeeOrg,
+        proxyName: formData.proxyName,
+        sourceToken: formData.apigeeToken,
+      });
+      if (deployments && deployments.length > 0) {
+        setProxyCheckStatus('found');
+        setDeploymentInfo(deployments);
+      } else {
+        setProxyCheckStatus('not_found');
+        setDeploymentInfo([]);
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to fetch deployment status');
+      setProxyCheckStatus('error');
+    } finally {
+      setIsCheckingStatus(false);
+    }
+  };
 
 
   return (
@@ -283,6 +310,23 @@ const Gitlab: React.FC = () => {
                         </Badge>
                       )}
                     </div>
+                    
+                  </div>
+                </div>
+
+                {/* Deployment status action */}
+                <div className="mt-2">
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium text-gray-700">Deployment status for each environment:</span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={onFetchDeploymentStatus}
+                      disabled={isCheckingStatus}
+                      className="bg-blue-300 text-blue-900 hover:bg-blue-400 active:bg-blue-500 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    >
+                      {isCheckingStatus ? 'Checking…' : 'Check Status'}
+                    </Button>
                   </div>
                 </div>
 
@@ -304,14 +348,16 @@ const Gitlab: React.FC = () => {
                       <Table>
                         <TableHeader style={{backgroundColor: '#E8F0FE'}}>
                           <TableRow>
-                            <TableHead className="w-1/2" style={{color: '#4285F4'}}>Environment</TableHead>
-                            <TableHead className="w-1/2" style={{color: '#4285F4'}}>Status</TableHead>
+                            <TableHead className="w-1/3" style={{color: '#4285F4'}}>Environment</TableHead>
+                            <TableHead className="w-1/3" style={{color: '#4285F4'}}>Revision</TableHead>
+                            <TableHead className="w-1/3" style={{color: '#4285F4'}}>Status</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {deploymentInfo.map((deployment, index) => (
                             <TableRow key={index} style={{backgroundColor: 'rgba(232, 240, 254, 0.3)'}}>
                               <TableCell className="font-medium">{deployment.environment}</TableCell>
+                              <TableCell>{deployment.revision || '-'}</TableCell>
                               <TableCell>
                                 <Badge 
                                   variant={deployment.status === 'Deployed' ? 'default' : 'secondary'}
@@ -368,7 +414,7 @@ const Gitlab: React.FC = () => {
                           onValueChange={(value) => setFormData((prev) => ({ ...prev, gitRef: value }))}
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder="Select branch or tag" />
+                            <SelectValue placeholder="Select branch " />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="dev">dev</SelectItem>
@@ -486,6 +532,12 @@ const Gitlab: React.FC = () => {
                   </div>
                 </div>
                 <div className="space-y-3">
+                  <div>
+                    <label className="text-sm font-medium text-green-700">Created by:</label>
+                    <div className="mt-1 p-3 bg-white border border-green-200 rounded-lg break-all text-green-800">
+                      {gitUsername || 'unknown'}
+                    </div>
+                  </div>
                   <div>
                     <label className="text-sm font-medium text-green-700">GitLab Project URL:</label>
                     <div className="mt-1 p-3 bg-white border border-green-200 rounded-lg">
