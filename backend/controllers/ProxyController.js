@@ -1,6 +1,7 @@
 const {
   fetchProxyFromOrg,    
-  SendProxyToOrg
+  SendProxyToOrg,
+  fetchAllProxies,
 } = require('../services/apiService');
 
 
@@ -63,8 +64,30 @@ const cloneProxy = async (req, res) => {
   }
 };
 
+const getAllProxies = async (req, res) => {
+  console.log('Fetch request received:', req.query);
+  const { sourceOrg , token } = req.query; 
+  if (!sourceOrg) {
+    return res.status(400).json({
+      success: false,
+      message: 'Missing required field: sourceOrg'
+    });
+  }
+  try {
+    const proxies = await fetchAllProxies(sourceOrg, token);
+    res.json(proxies);
+  } catch (error) {
+    const status = error.response?.status || 500;
+    const data = error.response?.data || error.message;
+    console.error('Error fetching proxies:', data);
+    res.status(status).json({ message: 'Failed to fetch proxies', error: data });
+  }
+};
+
+
 
 
 module.exports = {
-  cloneProxy
+  cloneProxy,
+  getAllProxies,
 };

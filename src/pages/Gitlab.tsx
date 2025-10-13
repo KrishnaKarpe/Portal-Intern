@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import { 
   GitBranch,
   ArrowRight,
@@ -17,6 +18,7 @@ import {
 import { 
   pushProxyToGitlab,
   fetchLatestRevision,
+  fetchProxies,
   fetchDeploymentStatus,
  } from '@/services/api';
 
@@ -54,6 +56,28 @@ const Gitlab: React.FC = () => {
     revision: '',
   });
 
+
+  const [allProxies, setAllProxies] = useState<string[]>([]); // full list
+  const [proxySuggestions, setProxySuggestions] = useState<string[]>([]); // filtered list
+  const [showProxySuggestions, setShowProxySuggestions] = useState(false);
+
+  useEffect(() => {
+    if (apigeeOrg && formData.apigeeToken?.trim()) {
+      fetchProxies(apigeeOrg, formData.apigeeToken)
+        .then((res) => {
+          console.log('Proxies received:', res);
+          const proxyList = Array.isArray(res.proxies) ? res.proxies.map(p => p.name) : [];
+          setAllProxies(proxyList);      
+          setProxySuggestions(proxyList);
+        })
+        .catch((err) => {
+          console.error('Error fetching proxies:', err);
+          setAllProxies([]);
+          setProxySuggestions([]);
+        });
+    }
+  }, [apigeeOrg, formData.apigeeToken]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -61,6 +85,22 @@ const Gitlab: React.FC = () => {
       [name]: value,
     }));
 
+  };
+
+  const handleProxyNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setFormData(prev => ({ ...prev, proxyName: value }));
+
+    if (!value) {
+      setShowProxySuggestions(false);
+      return;
+    }
+
+    const filtered = allProxies.filter(p =>
+      p.toLowerCase().includes(value.toLowerCase())
+    );
+    setProxySuggestions(filtered);
+    setShowProxySuggestions(true);
   };
 
   const onPushProxyToGitlab = async () => {
@@ -282,7 +322,30 @@ const Gitlab: React.FC = () => {
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700">Proxy Name *</label>
                     <div className="flex items-center gap-2">
-                      <Input name="proxyName" placeholder="Existing proxy in Apigee" value={formData.proxyName} onChange={handleChange} />
+                      <div className="relative w-full">
+                        <Input
+                          name="proxyName"
+                          placeholder="Existing proxy in Apigee"
+                          value={formData.proxyName}
+                          onChange={handleProxyNameChange}
+                        />
+                        {showProxySuggestions && proxySuggestions.length > 0 && (
+                          <ul className="absolute z-10 w-full bg-white border border-gray-300 mt-1 max-h-48 overflow-y-auto rounded-md shadow-lg">
+                            {proxySuggestions.map((p, i) => (
+                              <li
+                                key={i}
+                                className="px-3 py-2 hover:bg-blue-100 cursor-pointer"
+                                onClick={() => {
+                                  setFormData(prev => ({ ...prev, proxyName: p }));
+                                  setShowProxySuggestions(false);
+                                }}
+                              >
+                                {p}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
                       <Button
                         type="button"
                         size="sm"

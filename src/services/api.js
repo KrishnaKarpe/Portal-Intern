@@ -269,3 +269,28 @@ export const fetchDeploymentStatus = async (payload) => {
     throw error;
   }
 };
+
+export const fetchProxies = async (sourceOrg, token) => {
+  try {
+    const res = await fetch(`${API_URL}/proxy/getAllProxies?sourceOrg=${sourceOrg}&token=${token}`);
+
+    // Try parsing JSON safely
+    let data;
+    try {
+      data = await res.json();
+    } catch (jsonError) {
+      const text = await res.text(); // fallback to raw text
+      console.error('Backend returned non-JSON response:', text);
+      throw new Error(`Failed to fetch proxies. Backend returned non-JSON response.`);
+    }
+
+    if (!res.ok) {
+      throw new Error(data.message || 'Failed to fetch proxies.');
+    }
+
+    return data; // should be array of proxy names
+  } catch (error) {
+    console.error('Error fetching proxies:', error);
+    throw error;
+  }
+};

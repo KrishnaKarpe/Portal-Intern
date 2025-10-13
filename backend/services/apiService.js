@@ -567,10 +567,6 @@ const getGitUser = async (token) => {
   } 
 }; 
 
-<<<<<<< Updated upstream
-// Export functions
-=======
-// (exports moved to bottom)
 
 /**
  * Fetch deployments for a proxy from Apigee API
@@ -634,8 +630,25 @@ const fetchProxyDeployments = async (orgId, proxyName, token) => {
   }
 };
 
+
+/** Fetch all proxies from an organization using Apigee API
+ * @param {string} sourceOrg - Source organization ID
+ * @returns {Promise<Array>} - List of proxy names
+ */
+const fetchAllProxies = async (sourceOrg,token) => {
+  const url = `https://apigee.googleapis.com/v1/organizations/${sourceOrg}/apis`;
+
+  const res = await axios.get(url, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  //res.data is typically an array of proxy names
+  return res.data;
+};
+
+
+
 // Export functions with clear naming (placed after all definitions)
->>>>>>> Stashed changes
 module.exports = {
   fetchProductFromOrg,
   fetchAllProductsFromOrg,
@@ -649,4 +662,5 @@ module.exports = {
   fetchLatestRevision,
   getGitUser,
   fetchProxyDeployments,
+  fetchAllProxies
 };

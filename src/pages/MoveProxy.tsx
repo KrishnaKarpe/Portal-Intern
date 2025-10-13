@@ -9,6 +9,8 @@ import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { MoveProxy as apiMoveProxy } from '@/services/api';
+import { fetchProxies } from '@/services/api'; // your function to get proxies
+import { useEffect } from 'react';  
 import { 
   Copy, 
   Building2, 
@@ -47,6 +49,27 @@ const MoveProxy = () => {
     
   });
 
+  const [allProxies, setAllProxies] = useState<string[]>([]); // full list
+  const [proxySuggestions, setProxySuggestions] = useState<string[]>([]); // filtered list
+  const [showProxySuggestions, setShowProxySuggestions] = useState(false);
+
+  // <-- Add it here, with your other handlers
+  const handleProxyNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setFormData(prev => ({ ...prev, proxyName: value }));
+
+    if (!value) {
+      setShowProxySuggestions(false);
+      return;
+    }
+
+    const filtered = allProxies.filter(p =>
+      p.toLowerCase().includes(value.toLowerCase())
+    );
+    setProxySuggestions(filtered);
+    setShowProxySuggestions(true);
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -64,6 +87,23 @@ const MoveProxy = () => {
   const handleEnvironmentRemove = (environmentName: string) => {
     setSelectedEnvironments(selectedEnvironments.filter(env => env !== environmentName));
   }; 
+
+  useEffect(() => {
+    if (sourceOrg && formData.sourceToken?.trim()) {
+      fetchProxies(sourceOrg, formData.sourceToken)
+        .then((res) => {
+          console.log('Proxies received:', res);
+          const proxyList = Array.isArray(res.proxies) ? res.proxies.map(p => p.name) : [];
+          setAllProxies(proxyList);      
+          setProxySuggestions(proxyList);
+        })
+        .catch((err) => {
+          console.error('Error fetching proxies:', err);
+          setAllProxies([]);
+          setProxySuggestions([]);
+        });
+    }
+  }, [sourceOrg, formData.sourceToken]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -284,12 +324,30 @@ const MoveProxy = () => {
                     <label className="text-sm font-medium text-gray-700">
                       Existing Proxy Name *
                     </label>
-                    <Input
-                      name="proxyName"
-                      placeholder="Enter existing proxy name"
-                      value={formData.proxyName}
-                      onChange={handleChange}
-                    />
+                    <div className="relative">
+                      <Input
+                        name="proxyName"
+                        placeholder="Existing proxy in Apigee"
+                        value={formData.proxyName}
+                        onChange={handleProxyNameChange}
+                      />
+                      {showProxySuggestions && proxySuggestions.length > 0 && (
+                        <ul className="absolute z-10 w-full bg-white border border-gray-300 mt-1 max-h-48 overflow-y-auto rounded-md shadow-lg">
+                          {proxySuggestions.map((p, i) => (
+                            <li
+                              key={i}
+                              className="px-3 py-2 hover:bg-blue-100 cursor-pointer"
+                              onClick={() => {
+                                setFormData(prev => ({ ...prev, proxyName: p }));
+                                setShowProxySuggestions(false);
+                              }}
+                            >
+                              {p}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                   </div>
                   
                   <div className="space-y-2">
