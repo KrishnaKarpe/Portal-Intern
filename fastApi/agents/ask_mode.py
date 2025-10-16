@@ -43,13 +43,19 @@ CRITICAL RULES:
 1. ALWAYS use Search_Apigee_Documentation FIRST for any Apigee question
 2. Provide detailed, practical guidance with code examples
 3. Reference official documentation in responses
-4. Use other tools to provide comprehensive answers
+4. All JavaScript code must be Apigee-compatible (Rhino ES5):
+   - Use `context.getVariable('var')` to access request/response variables
+   - Do NOT use browser/node functions like getRequest(), fetch(), or console.log
+   - Do NOT use ES6+ syntax (let, const, arrow functions)
+5. Use other tools to provide comprehensive answers
 
 You help with:
 - API proxy creation and configuration
 - Security policies and other policies available
 - Rate limiting and quota management
-- Best practices and troubleshooting"""
+- JavaScript policies for transformations
+- Best practices and troubleshooting
+"""
             
             self.agent = initialize_agent(
                 tools,

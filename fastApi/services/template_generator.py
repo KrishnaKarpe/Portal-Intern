@@ -136,12 +136,13 @@ class ApigeeTemplates:
   <DisplayName>Verify API Key</DisplayName>
   <APIKey ref="request.queryparam.apikey"/>
 </VerifyAPIKey>''',
-            
-            "JavaScript": '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+
+"JavaScript": '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Javascript async="false" continueOnError="false" enabled="true" name="JavaScript">
   <DisplayName>JavaScript Transformation</DisplayName>
   <ResourceURL>jsc://transformation.js</ResourceURL>
 </Javascript>''',
+
             
             "AssignMessage": '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <AssignMessage continueOnError="false" enabled="true" name="AssignMessage">
@@ -200,64 +201,41 @@ class ApigeeTemplates:
     
     @staticmethod
     def generate_javascript_code(transformation_intent: str) -> str:
-        """Generate JavaScript code using ES5 syntax (real Apigee working version)"""
-        
+        """Generate minimal valid Apigee JavaScript (no print, no timestamps)"""
+
         intent_lower = transformation_intent.lower()
-        
-        # Pattern matching for common transformations
+
         if any(word in intent_lower for word in ["combine", "firstname", "lastname", "fullname"]):
-            return '''// Combine firstName and lastName into fullName - ES5 Apigee syntax
-try {
-    var responseContent = context.getVariable('response.content');
-    
-    if (!responseContent) {
-        context.setVariable('transformation.error', 'No response content available');
-        return;
-    }
-    
-    var data = JSON.parse(responseContent);
-    
-    // Combine firstName and lastName if both exist
-    if (data.firstName && data.lastName) {
-        data.fullName = data.firstName + ' ' + data.lastName;
-    }
-    
-    // Add processing metadata
-    data.processedAt = new Date().toISOString();
-    data.processedBy = 'Apigee-JavaScript';
-    
-    context.setVariable('response.content', JSON.stringify(data));
-    print('Transformation completed: firstName + lastName -> fullName');
-    
-} catch (error) {
-    context.setVariable('transformation.error', error.message);
-    print('Transformation error: ' + error.message);
-}'''
+            return '''// Combine firstName and lastName into fullName
+    try {
+        var responseContent = context.getVariable('response.content');
+        if (!responseContent) return;
+
+        var data = JSON.parse(responseContent);
+
+        if (data.firstName && data.lastName) {
+            data.fullName = data.firstName + ' ' + data.lastName;
+        }
+
+        context.setVariable('response.content', JSON.stringify(data));
+
+    } catch (e) {
+        context.setVariable('transformation.error', e.message);
+    }'''
         
         else:
-            # Generic template using ES5
             return f'''// Custom transformation: {transformation_intent}
-// Using ES5 JavaScript syntax (Apigee Rhino engine)
-try {{
-    var responseContent = context.getVariable('response.content');
-    
-    if (!responseContent) {{
-        context.setVariable('transformation.error', 'No response content available');
-        return;
-    }}
-    
-    var data = JSON.parse(responseContent);
-    
-    // TODO: Implement transformation logic for: {transformation_intent}
-    // Add transformation marker
-    data.transformed = true;
-    data.transformationType = '{transformation_intent}';
-    data.processedAt = new Date().toISOString();
-    
-    context.setVariable('response.content', JSON.stringify(data));
-    print('Custom transformation completed: {transformation_intent}');
-    
-}} catch (error) {{
-    context.setVariable('transformation.error', error.message);
-    print('Transformation error: ' + error.message);
-}}'''
+    try {{
+        var responseContent = context.getVariable('response.content');
+        if (!responseContent) return;
+
+        var data = JSON.parse(responseContent);
+
+        // Implement custom logic for: {transformation_intent}
+        data.transformed = true;
+
+        context.setVariable('response.content', JSON.stringify(data));
+
+    }} catch (e) {{
+        context.setVariable('transformation.error', e.message);
+    }}'''
