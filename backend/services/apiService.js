@@ -182,7 +182,7 @@ const createProductInOrg = async (orgId, productData, token, newProductName = nu
   }
 };
 
-
+//-----Proxies------
 
 /**
  * Fetch a single proxy from an organization using Apigee API
@@ -331,6 +331,7 @@ const SendProxyToOrg = async (orgId, proxyName, token, proxyBundle) => {
 };
 
 
+//------proxy to gitlab ------
 /**
  * Fetch GitLab project ID using project name
  * @param {string} proxyName - Project name (same as proxy name)
@@ -355,19 +356,23 @@ const getGitlabProjectId = async (proxyName, token) => {
  * @param {string} token - GitLab access token
  * @returns {Promise<number>} - Newly created project ID
  */
-const createGitlabProject = async (proxyName, token,template) => {
+const createGitlabProjectforProxy = async (proxyName, token) => {
   try {
     console.log(`Creating new GitLab project: ${proxyName}`);
     const response = await axios.post(
       'https://gitlab.com/api/v4/projects',
       {
         name: proxyName,
-        namespace_id: 116698866, 
-        //template_name : template ,
-        visibility: 'private',
+        namespace_id:  123,    //STATIC VALUE
+        group_with_project_templates_id : 123,     //STATIC VALUE
+        use_custom_template: true,
+        template_project_id :  123      //Static Value
       },
       {
-        headers: { 'PRIVATE-TOKEN': token },
+        headers: { 
+          'PRIVATE-TOKEN': token ,
+          'Content-Type': 'application/json'
+        },
       }
     );
     console.log(`✅ Created project ${proxyName} with ID ${response.data.id}`);
@@ -378,17 +383,19 @@ const createGitlabProject = async (proxyName, token,template) => {
   }
 };
 
+
+
+
 /**
  * Upload project to GitLab
  * @param {string} proxyName - Proxy name / GitLab project name
  * @param {string} token - GitLab access token
  * @param {Buffer} proxyBundle - Proxy bundle binary (zip)
  * @param {string} branch - Target branch (default: 'main')
- * @param {string} template - Template to use for new project (optional)
  * @param {Array} environments - Environments to set up in the new project (if created)
  * @returns {Promise<Object>} - Upload response { success, projectId, username, gitlabProjectUrl }
  */
-const sendProxyToGitlab = async (proxyName, token, proxyBundle, branch, template, environments = []) => {
+const sendProxyToGitlab = async (proxyName, token, proxyBundle, branch, environments = []) => {
   try {
     console.log(`🔍 Checking for GitLab project: ${proxyName}`);
 
@@ -410,83 +417,58 @@ const sendProxyToGitlab = async (proxyName, token, proxyBundle, branch, template
       console.log(`✅ Found GitLab project ${proxyName} (ID: ${projectId})`);
     } catch {
       console.log(`🚀 Creating new GitLab project: ${proxyName}`);
-      projectId = await createGitlabProject(proxyName, token, "python");
+      projectId = await createGitlabProjectforProxy(proxyName, token);
       isNewProject = true;
+      console.log(`✅ New project created (ID: ${projectId}) — base branch 'prod-public' will be auto-created`);
     }
 
+    if (isNewProject) {
+      await waitForRepoReady(projectId, token);
+      console.log('⏳ Repository initialization confirmed — proceeding to create branches...');
+    }
+
+    const baseBranch = "prod-public";
     const uploadBranch = branch;
 
-    // If new project, create at least 1 branch
-    if (isNewProject) {
-      console.log(`Creating environment branches: ${environments.join(', ') || 'dev'}`);
-      const baseBranch = environments[0] || 'dev';
-
-      // Create first branch
-      await axios.post(
-        `https://gitlab.com/api/v4/projects/${projectId}/repository/files/README.md`,
-        {
-          branch: baseBranch,
-          content: `# ${proxyName}`,
-          commit_message: `Initial commit on ${baseBranch}`,
-        },
+    // Step 2: Ensure branches exist
+    try {    //check if selected branch exists
+      await axios.get(
+        `https://gitlab.com/api/v4/projects/${projectId}/repository/branches/${encodeURIComponent(uploadBranch)}`,
         { headers: { 'PRIVATE-TOKEN': token } }
       );
-      console.log(`✅ Created initial branch '${baseBranch}' with README`);
 
-      for (const env of environments.slice(1)) {
-        try {
-          await axios.post(
-            `https://gitlab.com/api/v4/projects/${projectId}/repository/branches`,
-            { branch: env, ref: baseBranch },
-            { headers: { 'PRIVATE-TOKEN': token } }
-          );
-          console.log(`✅ Created branch '${env}'`);
-        } catch (err) {
-          console.warn(`⚠️ Skipped '${env}': ${err.response?.data?.message || err.message}`);
-        }
-      }
-    } else {
-      // When not new project: ensure selected branch exists
+      console.log(`✅ Branch '${uploadBranch}' exists`);
+    } catch {    //if not exist create from prod
+      console.log(`⚠️ Branch '${uploadBranch}' missing — creating from '${baseBranch}'`);
+      
+      await axios.post(
+        `https://gitlab.com/api/v4/projects/${projectId}/repository/branches`,
+        { branch: uploadBranch, ref: baseBranch },
+        { headers: { 'PRIVATE-TOKEN': token } }
+        
+      );
+      console.log(`⚠️ Branch '${uploadBranch}' created from '${baseBranch}'`);
+    }
+
+    // Step 3: check for envs
+    for (const env of environments) {
+      if (env === uploadBranch) continue;
       try {
         await axios.get(
-          `https://gitlab.com/api/v4/projects/${projectId}/repository/branches/${encodeURIComponent(branch)}`,
+          `https://gitlab.com/api/v4/projects/${projectId}/repository/branches/${encodeURIComponent(env)}`,
           { headers: { 'PRIVATE-TOKEN': token } }
         );
-        console.log(`✅ Branch '${branch}' exists`);
+        console.log(`✅ Branch '${env}' exists`);
       } catch {
-        console.log(`⚠️ Branch '${branch}' missing — creating now...`);
-        const ref = environments[0] || 'dev';
+        console.log(`⚠️ Creating missing branch '${env}' from '${baseBranch}'`);
         await axios.post(
           `https://gitlab.com/api/v4/projects/${projectId}/repository/branches`,
-          { branch, ref },
+          { branch: env, ref: baseBranch },
           { headers: { 'PRIVATE-TOKEN': token } }
         );
       }
     }
-
-    // Create other environment branches if they don't exist
-    for (const env of environments) {
-      if (env === branch) continue; // Skip upload branch
-        try {   //checking env exists already
-          await axios.get(
-            `https://gitlab.com/api/v4/projects/${projectId}/repository/branches/${encodeURIComponent(env)}`,
-            { headers: { 'PRIVATE-TOKEN': token } }
-          );
-          console.log(`✅ Branch '${env}' exists`);
-        } catch {   //if not
-            try {
-              await axios.post(
-                `https://gitlab.com/api/v4/projects/${projectId}/repository/branches`,
-                { branch: env, ref: branch }, // create from upload branch
-                { headers: { 'PRIVATE-TOKEN': token } }
-              );
-              console.log(`✅ Created missing branch '${env}' from '${branch}'`);
-            } catch (err) {
-            console.warn(`⚠️ Skipped '${env}': ${err.response?.data?.message || err.message}`);
-            }
-        }
-    }
-
+     // Step 4: Upload files
     // Fetch project info
     let gitlabProjectUrl;
     try {
@@ -503,54 +485,69 @@ const sendProxyToGitlab = async (proxyName, token, proxyBundle, branch, template
     const entries = zip.getEntries();
     console.log(`📦 Preparing to upload ${entries.length} files...`);
 
+    const actions=[];
     for (const entry of entries) {
       if (entry.isDirectory) continue;
 
       const repoPath = entry.entryName.replace(/\\/g, '/');
-      const fileUrl = `https://gitlab.com/api/v4/projects/${projectId}/repository/files/${encodeURIComponent(repoPath)}`;
+      //const fileUrl = `https://gitlab.com/api/v4/projects/${projectId}/repository/files/${encodeURIComponent(repoPath)}`;
       const content = entry.getData().toString('base64');
 
-      try {
-        // File creation
-        await axios.post(
-          fileUrl,
-          {
-            branch : uploadBranch,
-            content,
-            commit_message: `Upload ${repoPath} by ${usernameToUse} on branch ${uploadBranch}`,
-            encoding: 'base64',
-          },
-          { headers: { 'PRIVATE-TOKEN': token } }
-        );
-      } catch (err) {
-        // If file exists, update with PUT
-        if (err.response?.status === 400) {
-          await axios.put(
-            fileUrl,
-            {
-              branch : uploadBranch,
-              content,
-              commit_message: `Update ${repoPath} by ${usernameToUse}`,
-              encoding: 'base64',
-            },
-            { headers: { 'PRIVATE-TOKEN': token } }
-          );
-        } else {
-          throw err;
-        }
-      }
-
-      console.log(`📤 Uploaded: ${repoPath}`);
+      actions.push({
+        action: 'create', // or 'update' depending on logic
+        file_path: repoPath,
+        content: Buffer.from(content, 'base64').toString('utf8'),
+      });
     }
 
-    console.log(`✅ Proxy bundle uploaded successfully to ${proxyName}`);
-    return { success: true, projectId, username: usernameToUse, gitlabProjectUrl };
+    const commitUrl = `https://gitlab.com/api/v4/projects/${projectId}/repository/commits`;
+
+    const commitResp = await axios.post(
+      commitUrl,
+      {
+        branch: uploadBranch,
+        commit_message: `Upload all proxy files for ${proxyName} by ${usernameToUse}`,
+        actions,
+      },
+      { headers: { 'PRIVATE-TOKEN': token } }
+    );
+
+    console.log(`✅ Single commit created: ${commitResp.data.id}`);
+    return { success: true, projectId, username: usernameToUse, gitlabProjectUrl, commitId: commitResp.data.id };
+
+
+      
+
+    
   } catch (error) {
     console.error('❌ Error uploading proxy:', error.response?.data || error.message);
     throw error;
   }
 };
 
+
+async function waitForRepoReady(projectId, token) {
+  const maxAttempts = 10; // retry up to 10 times
+  const delay = ms => new Promise(res => setTimeout(res, ms));
+
+  for (let i = 0; i < maxAttempts; i++) {
+    try {
+      const resp = await axios.get(
+        `https://gitlab.com/api/v4/projects/${projectId}/repository/branches`,
+        { headers: { 'PRIVATE-TOKEN': token } }
+      );
+      if (Array.isArray(resp.data)) {
+        console.log(`✅ Repo ready after ${i + 1} attempt(s).`);
+        return;
+      }
+    } catch {
+      console.log(`⏳ Waiting for GitLab repo to initialize... (${i + 1}/${maxAttempts})`);
+    }
+    await delay(3000); // wait 3 seconds between tries
+  }
+
+  throw new Error('❌ Repository did not become ready in time.');
+}
 
 //get user from git
 const getGitUser = async (token) => {
@@ -647,6 +644,45 @@ const fetchAllProxies = async (sourceOrg,token) => {
 };
 
 
+//------product to gitlab ------
+
+/**
+ * Create a new project in GitLab if it doesn’t exist
+ * @param {string} productName - Project name (same as proxy name)
+ * @param {string} token - GitLab access token
+ * @returns {Promise<number>} - Newly created project ID
+ */
+const createGitlabProjectforProduct = async (productName, token) => {
+  try {
+    console.log(`Creating new GitLab project: ${productName}`);
+    const response = await axios.post(
+      'https://gitlab.com/api/v4/projects',
+      {
+        name: productName,
+        namespace_id: 123 ,    //STATIC VALUE
+        group_with_project_templates_id : 123,     //STATIC VALUE
+        use_custom_template: true,
+        template_project_id : 123       //Static Value
+      },
+      {
+        headers: { 
+          'PRIVATE-TOKEN': token ,
+          'Content-Type': 'application/json'
+        },
+      }
+    );
+    console.log(`✅ Created project ${productName} with ID ${response.data.id}`);
+    return response.data.id;
+  } catch (error) {
+    console.error('❌ Failed to create GitLab project:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+
+
+
+
 
 // Export functions with clear naming (placed after all definitions)
 module.exports = {
@@ -657,10 +693,11 @@ module.exports = {
   fetchProxyFromOrg,
   SendProxyToOrg,
   sendProxyToGitlab,
-  createGitlabProject,
+  createGitlabProjectforProxy,
   getGitlabProjectId,
   fetchLatestRevision,
   getGitUser,
   fetchProxyDeployments,
-  fetchAllProxies
+  fetchAllProxies,
+  createGitlabProjectforProduct,
 };
