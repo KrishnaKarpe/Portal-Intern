@@ -491,12 +491,14 @@ const sendProxyToGitlab = async (proxyName, token, proxyBundle, branch, environm
 
       const repoPath = entry.entryName.replace(/\\/g, '/');
       //const fileUrl = `https://gitlab.com/api/v4/projects/${projectId}/repository/files/${encodeURIComponent(repoPath)}`;
-      const content = entry.getData().toString('base64');
+      //const content = entry.getData().toString('base64');
+      const rawData = entry.getData();
 
       actions.push({
-        action: 'create', // or 'update' depending on logic
+        action: 'create', 
         file_path: repoPath,
-        content: Buffer.from(content, 'base64').toString('utf8'),
+        content: rawData.toString("base64"),
+        encoding: "base64" 
       });
     }
 
@@ -506,7 +508,7 @@ const sendProxyToGitlab = async (proxyName, token, proxyBundle, branch, environm
       commitUrl,
       {
         branch: uploadBranch,
-        commit_message: `Upload all proxy files for ${proxyName} by ${usernameToUse}`,
+        commit_message: `Upload all proxgit statusy files for ${proxyName} by ${usernameToUse}`,
         actions,
       },
       { headers: { 'PRIVATE-TOKEN': token } }
