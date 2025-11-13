@@ -294,3 +294,28 @@ export const fetchProxies = async (sourceOrg, token) => {
     throw error;
   }
 };
+
+//move products api
+/**
+ * @param {Object} gitdata2 - Proxy data to clone
+ * @returns {Promise<Object>} API response
+ */
+export const pushProductToGitlab = async (gitdata2) => {
+  try{
+  const response = await fetch(`${API_URL}/git/gitproduct`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(gitdata2),
+    });
+    const resdata = await response.json();
+
+      if (!response.ok) {
+        throw new Error(resdata.message || 'Failed to clone product for gitlab');
+      }
+
+      return resdata;
+  } catch (error) {
+    console.error('Error cloning product:', error);
+    throw error;
+  }
+};
