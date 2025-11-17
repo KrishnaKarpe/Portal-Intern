@@ -13,6 +13,7 @@ import NotFound from "./pages/NotFound";
 import MoveProxy from "./pages/MoveProxy";
 import CloneproxySuccess from "./pages/CloneproxySuccess";
 import Gitlab from "./pages/Gitlab";
+import GitlabProduct from "./pages/GitlabProduct";
 
 const queryClient = new QueryClient();
 
@@ -33,6 +34,7 @@ const App = () => {
             <Route path="/move-proxy" element={<MainLayout><MoveProxy /></MainLayout>} />
             <Route path="/clone-proxy-success" element={<MainLayout><CloneproxySuccess /></MainLayout>} />
             <Route path="/gitlab" element={<MainLayout><Gitlab /></MainLayout>} />
+            <Route path="/gitlab-product" element={<MainLayout><GitlabProduct /></MainLayout>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

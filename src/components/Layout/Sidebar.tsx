@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ChevronsLeft, ChevronsRight, Layers, RefreshCw, List, Package, GitBranch } from 'lucide-react';
+import { ChevronsLeft, ChevronsRight, Layers, RefreshCw, List, Package, GitBranch, UploadCloud, Boxes, ShoppingBag } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const menuItems = [
@@ -22,14 +22,19 @@ const menuItems = [
     icon: <RefreshCw className="h-5 w-5 mr-3" />,
   },
   {
-    name: 'Move proxies across organizations',
+    name: 'Move Proxies Across Org',
     path: '/move-proxy',
     icon: <Package className="h-5 w-5 mr-3" />,
   },
   {
-    name: 'Apigee → GitLab',
+    name: 'Push Proxy to GitLab',
     path: '/gitlab',
-    icon: <GitBranch className="h-5 w-5 mr-3" />,
+    icon: <UploadCloud className="h-5 w-5 mr-3" />,
+  },
+  {
+    name: 'Push Product to GitLab',
+    path: '/gitlab-product',
+    icon: <Boxes className="h-5 w-5 mr-3" />,
   },
   {
     name: 'List All Proxies',
@@ -39,7 +44,7 @@ const menuItems = [
   {
     name: 'List All Products',
     path: '/list-products',
-    icon: <Package className="h-5 w-5 mr-3" />,
+    icon: <ShoppingBag className="h-5 w-5 mr-3" />,
   },
 ];
 
