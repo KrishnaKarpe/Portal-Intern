@@ -16,27 +16,29 @@ import Gitlab from "./pages/Gitlab";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<MainLayout><Navigate to="/clone-product" replace /></MainLayout>} />
-          <Route path="/clone-product" element={<MainLayout><CloneProduct /></MainLayout>} />
-          <Route path="/clone-success" element={<MainLayout><CloneSuccess /></MainLayout>} />
-          <Route path="/update-product" element={<MainLayout><UpdateProduct /></MainLayout>} />
-          <Route path="/list-proxies" element={<MainLayout><ListProxies /></MainLayout>} />
-          <Route path="/list-products" element={<MainLayout><ListProducts /></MainLayout>} />
-          <Route path="/move-proxy" element={<MainLayout><MoveProxy /></MainLayout>} />
-          <Route path="/clone-proxy-success" element={<MainLayout><CloneproxySuccess /></MainLayout>} />
-          <Route path="/gitlab" element={<MainLayout><Gitlab /></MainLayout>} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+const App = () => {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<MainLayout><Navigate to="/clone-product" replace /></MainLayout>} />
+            <Route path="/clone-product" element={<MainLayout><CloneProduct /></MainLayout>} />
+            <Route path="/clone-success" element={<MainLayout><CloneSuccess /></MainLayout>} />
+            <Route path="/update-product" element={<MainLayout><UpdateProduct /></MainLayout>} />
+            <Route path="/list-proxies" element={<MainLayout><ListProxies /></MainLayout>} />
+            <Route path="/list-products" element={<MainLayout><ListProducts /></MainLayout>} />
+            <Route path="/move-proxy" element={<MainLayout><MoveProxy /></MainLayout>} />
+            <Route path="/clone-proxy-success" element={<MainLayout><CloneproxySuccess /></MainLayout>} />
+            <Route path="/gitlab" element={<MainLayout><Gitlab /></MainLayout>} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;

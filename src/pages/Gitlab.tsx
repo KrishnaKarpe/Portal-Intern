@@ -14,6 +14,7 @@ import {
   GitBranch,
   ArrowRight,
 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 import { 
   pushProxyToGitlab,
@@ -41,6 +42,7 @@ const Gitlab: React.FC = () => {
   const [gitlabProjectUrl, setGitlabProjectUrl] = useState('');
   const [gitUsername, setGitUsername] = useState('');
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
+  const [pushedAt, setPushedAt] = useState<string>('');
 
   // Apigee selections
   const [apigeeOrg, setApigeeOrg] = useState("");
@@ -155,6 +157,7 @@ const Gitlab: React.FC = () => {
         setShowSuccessCard(true);
         // Use GitLab project URL from backend response consistently
         setGitlabProjectUrl(gitUrl);
+        setPushedAt(new Date().toLocaleString());
       }, 1000);
       
     } catch (e: any) {
@@ -552,19 +555,24 @@ const Gitlab: React.FC = () => {
                     onClick={onPushProxyToGitlab}
                     disabled={isLoading}
                     className={`w-full font-semibold focus:outline-none focus:ring-2 py-3 text-lg transition-all duration-300 ${
-                      buttonAnimationPhase === 'phase1' || buttonAnimationPhase === 'phase2'
+                      buttonAnimationPhase === 'phase2'
                         ? 'bg-green-500 text-white hover:bg-green-600'
                         : 'bg-blue-300 text-blue-900 hover:bg-blue-400 active:bg-blue-500 focus:ring-blue-400'
                     }`}
                   >
-                    {buttonAnimationPhase === 'phase1' || buttonAnimationPhase === 'phase2' ? (
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        Pushing to GitLab...
+                      </>
+                    ) : buttonAnimationPhase === 'phase2' ? (
                       <>
                         ✓ Created!
                         <ArrowRight className="ml-2 h-5 w-5" />
                       </>
                     ) : (
                       <>
-                        Create File
+                        Push to GitLab
                         <ArrowRight className="ml-2 h-5 w-5" />
                       </>
                     )}
@@ -583,7 +591,7 @@ const Gitlab: React.FC = () => {
             transition={{ duration: 0.5, ease: "easeOut" }}
             className="mt-6"
           >
-            <Card className="shadow-lg border-green-200 bg-green-50">
+            <Card className="shadow-xl shadow-green-200/60 border border-green-300 bg-green-50/80 rounded-xl">
               <CardContent className="p-6">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
@@ -595,24 +603,39 @@ const Gitlab: React.FC = () => {
                   </div>
                 </div>
                 <div className="space-y-3">
-                  <div>
-                    <label className="text-sm font-medium text-green-700">Created by:</label>
-                    <div className="mt-1 p-3 bg-white border border-green-200 rounded-lg break-all text-green-800">
-                      {gitUsername || 'unknown'}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-green-700">GitLab Project URL:</label>
-                    <div className="mt-1 p-3 bg-white border border-green-200 rounded-lg">
-                      <a 
-                        href={gitlabProjectUrl} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-800 underline break-all"
-                      >
-                        {gitlabProjectUrl}
-                      </a>
-                    </div>
+                  <div className="rounded-lg overflow-hidden border border-green-300 bg-white shadow-md shadow-green-200/50">
+                    <Table>
+                      <TableBody>
+                        <TableRow className="border-b border-green-200 last:border-b-0">
+                          <TableCell className="font-medium text-green-800 w-40">Proxy</TableCell>
+                          <TableCell className="break-all text-green-900 border-l border-green-200">{formData.proxyName || '-'}</TableCell>
+                        </TableRow>
+                        <TableRow className="border-b border-green-200 last:border-b-0">
+                          <TableCell className="font-medium text-green-800">Branch</TableCell>
+                          <TableCell className="break-all text-green-900 border-l border-green-200">{formData.gitRef || '-'}</TableCell>
+                        </TableRow>
+                        <TableRow className="border-b border-green-200 last:border-b-0">
+                          <TableCell className="font-medium text-green-800">Pushed at</TableCell>
+                          <TableCell className="break-all text-green-900 border-l border-green-200">{pushedAt || '-'}</TableCell>
+                        </TableRow>
+                        <TableRow className="border-b border-green-200 last:border-b-0">
+                          <TableCell className="font-medium text-green-800">Created by</TableCell>
+                          <TableCell className="break-all text-green-900 border-l border-green-200">{gitUsername || 'unknown'}</TableCell>
+                        </TableRow>
+                        <TableRow className="border-b border-green-200 last:border-b-0">
+                          <TableCell className="font-medium text-green-800">Project</TableCell>
+                          <TableCell className="break-all border-l border-green-200">
+                            {gitlabProjectUrl ? (
+                              <a href={gitlabProjectUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline">
+                                {gitlabProjectUrl}
+                              </a>
+                            ) : (
+                              <span className="text-green-900">-</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
                   </div>
                   <div className="flex gap-3">
                     <Button
