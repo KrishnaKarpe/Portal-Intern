@@ -506,16 +506,19 @@ const GitlabProduct: React.FC = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">
-                      Group Name *
-                    </label>
-                    <Input
-                      name="gitlabGroupName"
-                      placeholder="e.g. apigee-products"
-                      value={formData.gitlabGroupName}
-                      onChange={handleChange}
-                    />
-                  </div>
+                                      <label className="text-sm font-medium text-gray-700">Group Name *</label>
+                                      <Select
+                                        value={formData.template}
+                                        onValueChange={(value) => setFormData((prev) => ({ ...prev, template: value }))}
+                                      >
+                                        <SelectTrigger>
+                                          <SelectValue placeholder="Select template" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="apigee-cicd">Product</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">

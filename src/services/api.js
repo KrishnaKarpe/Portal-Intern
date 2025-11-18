@@ -294,3 +294,6 @@ export const pushProductToGitlab = async (gitdata2) => {
     throw error;
   }
 };
+
+
+// deployProxy  /proxy/deploy

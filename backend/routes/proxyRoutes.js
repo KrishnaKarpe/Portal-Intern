@@ -8,6 +8,7 @@ const {
 
 //operations
 router.post('/move', cloneProxy);
+router.post('/deploy', deployproxy);    
 router.get('/getAllProxies', getAllProxies);
 
 

@@ -2,6 +2,7 @@ const {
   fetchProxyFromOrg,    
   SendProxyToOrg,
   fetchAllProxies,
+  DeployProxyinOrg,
 } = require('../services/apiService');
 
 
@@ -84,10 +85,40 @@ const getAllProxies = async (req, res) => {
   }
 };
 
+const deployproxy = async (req, res) => {
+  console.log('Deploy request received:', req.body);
 
+  try {
+    const { targetOrg, targetToken, newProxyName, environment } = req.body;
 
+    if (!targetOrg || !targetToken || !newProxyName || !environment) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields'
+      });
+    }
+
+    const result = await DeployProxyinOrg(targetOrg, newProxyName, targetToken, environment);
+
+    return res.status(200).json({
+      success: true,
+      message: `Proxy ${newProxyName} deployed successfully to ${environment}`,
+      data: result
+    });
+
+  } catch (error) {
+    console.error("Deploy error:", error);
+
+    return res.status(error.status || 500).json({
+      success: false,
+      message: error.message || "Failed to deploy proxy",
+      error: error.details
+    });
+  }
+};
 
 module.exports = {
   cloneProxy,
   getAllProxies,
+  deployproxy,
 };

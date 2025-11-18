@@ -28,6 +28,7 @@ const organizations = [
   { id: 2, name: 'apigee-non-prod-crjb', type: 'Non-Production' },
 ];
 
+
 const availableEnvironments = [
   { id: 1, name: 'apim-dev', type: 'Development' },
   { id: 2, name: 'apim-uat-internal', type: 'UAT Internal' },
@@ -429,7 +430,7 @@ const MoveProxy = () => {
                   )}
 
                   <p className="text-xs text-gray-500">
-                    Select one or more environments for your cloned proxy
+                    Select one or more environments for your proxy to be deployed to.
                   </p>
                 </div>
               </div> 
