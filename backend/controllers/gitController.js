@@ -167,7 +167,7 @@ const gitProduct = async (req, res) => {
       username: gitResult2.username,
       projectUrl: gitResult2.gitlabProjectUrl,
       branch: "dev",
-      data: gitResult
+      data: gitResult2
     });
 
 

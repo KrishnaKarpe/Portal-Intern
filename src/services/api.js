@@ -204,7 +204,6 @@ export const pushProxyToGitlab = async (gitdata) => {
   }
 };
 
-
 //to get latest revision
 /**
  * Fetch the latest revision number of a proxy in the source organization
@@ -227,7 +226,6 @@ export const fetchLatestRevision = async (payload) => {
     throw error;
   }
 };
-
 // Fetch deployment status for a proxy
 // payload: { sourceOrg, proxyName, sourceToken }
 export const fetchDeploymentStatus = async (payload) => {

@@ -61,7 +61,7 @@ const GitlabProduct: React.FC = () => {
     template: 'apigee-product-cicd',
   });
   const [selectedEnvironments, setSelectedEnvironments] = useState<string[]>([
-    'prod-public',
+    'prod',
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const [buttonAnimationPhase, setButtonAnimationPhase] = useState<
@@ -552,7 +552,7 @@ const GitlabProduct: React.FC = () => {
                     GitLab Environments
                   </label>
                   <div className="grid gap-3 md:grid-cols-3">
-                    {['dev', 'uat-public', 'prod-public'].map((env) => (
+                    {['dev', 'uat-public', 'prod'].map((env) => (
                       <div key={env} className="flex items-center space-x-2">
                         <Checkbox
                           id={`product-${env}`}

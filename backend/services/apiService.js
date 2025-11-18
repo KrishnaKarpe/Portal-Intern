@@ -385,7 +385,6 @@ const createGitlabProjectforProxy = async (proxyName, token) => {
 
 
 
-
 /**
  * Upload project to GitLab
  * @param {string} proxyName - Proxy name / GitLab project name
@@ -645,6 +644,8 @@ const fetchAllProxies = async (sourceOrg,token) => {
 };
 
 
+
+
 //------product to gitlab ------
 
 /**
@@ -660,10 +661,10 @@ const createGitlabProjectforProduct = async (productName, token) => {
       'https://gitlab.com/api/v4/projects',
       {
         name: productName,
-        namespace_id: 123 ,    //STATIC VALUE
-        group_with_project_templates_id : 123,     //STATIC VALUE
+        namespace_id: 105945867 ,    //STATIC VALUE
+        group_with_project_templates_id : 106119093,     //STATIC VALUE
         use_custom_template: true,
-        template_project_id : 123       //Static Value
+        template_project_id : 69176428       //Static Value
       },
       {
         headers: { 
@@ -679,7 +680,6 @@ const createGitlabProjectforProduct = async (productName, token) => {
     throw error;
   }
 };
-
 
 const pushProductToGitlab = async (productName, token, productData, environments = [] ) => {
   try {
@@ -705,7 +705,7 @@ const pushProductToGitlab = async (productName, token, productData, environments
       console.log(`🚀 Creating new GitLab project: ${productName}`);
       projectId = await createGitlabProjectforProduct(productName, token);
       isNewProject = true;
-      console.log(`✅ New project created (ID: ${projectId}) — base branch 'prod-public' will be auto-created`);
+      console.log(`✅ New project created (ID: ${projectId}) — base branch 'prod' will be auto-created`);
     }
 
     if (isNewProject) {
@@ -713,7 +713,7 @@ const pushProductToGitlab = async (productName, token, productData, environments
       console.log('⏳ Repository initialization confirmed — proceeding to create branches...');
     }
 
-    const baseBranch = "prod-public";
+    const baseBranch = "prod";
     const uploadBranch = "dev" ;
 
     // Step 2: Ensure branches exist
@@ -737,7 +737,7 @@ const pushProductToGitlab = async (productName, token, productData, environments
       console.log(`⚠️ Branch '${uploadBranch}' created from '${baseBranch}'`);
     }
 
-    // Step 3: check for envs
+    // Step 3: check for envs i.e branches to be made
     for (const env of environments) {
       if (env === uploadBranch) continue;
       try {
@@ -755,54 +755,67 @@ const pushProductToGitlab = async (productName, token, productData, environments
         );
       }
     }
-    // Step 4: Upload files
-    // Fetch project info
+
+    // Step 4: Upload product artifact files
+
+    // Fetch project info (same as proxy version)
     let gitlabProjectUrl;
     try {
-      const projResp = await axios.get(`https://gitlab.com/api/v4/projects/${projectId}`, {
-        headers: { 'PRIVATE-TOKEN': token }
-      });
+      const projResp = await axios.get(
+        `https://gitlab.com/api/v4/projects/${projectId}`,
+        { headers: { 'PRIVATE-TOKEN': token } }
+      );
       gitlabProjectUrl = projResp.data.web_url;
     } catch (err) {
       console.warn('Could not fetch project info to get web_url:', err.message || err);
     }
 
-    // Unzip bundle in memory
-    const zip = new AdmZip(productData);
-    const entries = zip.getEntries();
-    console.log(`📦 Preparing to upload ${entries.length} files...`);
+    // Prepare JSON data
+    const productJson = JSON.stringify(productData, null, 2);
+    const base64Data = Buffer.from(productJson).toString("base64");
+    const timestamp = new Date().toISOString();
 
-    const actions=[];
-    for (const entry of entries) {
-      if (entry.isDirectory) continue;
+    // paths inside product-artifact
+    const folders = ["dev", "uat", "prod"];
 
-      const repoPath = entry.entryName.replace(/\\/g, '/');
-      //const fileUrl = `https://gitlab.com/api/v4/projects/${projectId}/repository/files/${encodeURIComponent(repoPath)}`;
-      //const content = entry.getData().toString('base64');
-      const rawData = entry.getData();
+    // Build actions array (same structure as proxy)
+    const actions = [];
+
+    for (const folder of folders) {
+      const repoPath = `product-artifact/${folder}/create-update-product.json`;
 
       actions.push({
-        action: 'create', 
+        action: "update",                 // or "update" if needed
         file_path: repoPath,
-        content: rawData.toString("base64"),
-        encoding: "base64" 
+        content: base64Data,
+        encoding: "base64"
       });
     }
 
+    console.log(`📦 Preparing to upload product files for ${productName}...`);
+
+    // Push commit
     const commitUrl = `https://gitlab.com/api/v4/projects/${projectId}/repository/commits`;
 
     const commitResp = await axios.post(
       commitUrl,
       {
-        branch: uploadBranch,
-        commit_message: `Upload all proxgit statusy files for ${productName} by ${usernameToUse}`,
-        actions,
+        branch: uploadBranch,   // always dev
+        commit_message: `Upload product JSON for ${productName} by ${usernameToUse} (${timestamp})`,
+        actions
       },
-      { headers: { 'PRIVATE-TOKEN': token } }
+      { headers: { "PRIVATE-TOKEN": token } }
     );
 
     console.log(`✅ Single commit created: ${commitResp.data.id}`);
-    return { success: true, projectId, username: usernameToUse, gitlabProjectUrl, commitId: commitResp.data.id };
+
+    return {
+      success: true,
+      projectId,
+      username: usernameToUse,
+      gitlabProjectUrl,
+      commitId: commitResp.data.id
+    };
   } catch (error) {
     console.error('❌ Error uploading proxy:', error.response?.data || error.message);
     throw error;
