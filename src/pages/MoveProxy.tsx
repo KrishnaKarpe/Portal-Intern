@@ -29,18 +29,32 @@ const organizations = [
 ];
 
 
-const availableEnvironments = [
+const nonprodEnvironments = [
   { id: 1, name: 'apim-dev', type: 'Development' },
   { id: 2, name: 'apim-uat-internal', type: 'UAT Internal' },
   { id: 3, name: 'apim-uat-public', type: 'UAT Public' },
 ]; 
+const prodEnvironments = [
+  { id: 4, name: 'apim-prod1', type: 'Development' },
+  { id: 5, name: 'apim-prod2', type: 'UAT Internal' },
+  { id: 6, name: 'apim-prod3', type: 'UAT Public' },
+]; 
+
+
+// Helper for selecting environments based on org
+const getAvailableEnvironments = (org) => {
+  if (org === "apigee-non-prod-crjb") return nonprodEnvironments;
+  if (org === "apigee-prod-ouax") return prodEnvironments;
+  return [];
+};
 
 const MoveProxy = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [sourceOrg, setSourceOrg] = useState("");
   const [targetOrg, setTargetOrg] = useState("");
-  const [selectedEnvironments, setSelectedEnvironments] = useState<string[]>([]);
+  const [availableEnvironments, setAvailableEnvironments] = useState([]);
+  const [selectedEnvironment, setSelectedEnvironment] = useState("");
   const [formData, setFormData] = useState({
     sourceToken: '',
     targetToken: '',
@@ -78,16 +92,7 @@ const MoveProxy = () => {
       [name]: value,
     }));
   };
-//dsfhddj
-   const handleEnvironmentSelect = (environmentName: string) => {
-    if (!selectedEnvironments.includes(environmentName)) {
-      setSelectedEnvironments([...selectedEnvironments, environmentName]);
-    }
-  }; 
 
-  const handleEnvironmentRemove = (environmentName: string) => {
-    setSelectedEnvironments(selectedEnvironments.filter(env => env !== environmentName));
-  }; 
 
   useEffect(() => {
     if (sourceOrg && formData.sourceToken?.trim()) {
@@ -105,6 +110,14 @@ const MoveProxy = () => {
         });
     }
   }, [sourceOrg, formData.sourceToken]);
+
+
+   // Update environments when target org changes
+  useEffect(() => {
+    setAvailableEnvironments(getAvailableEnvironments(targetOrg));
+    setSelectedEnvironment(""); // reset env
+  }, [targetOrg]);
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -124,6 +137,10 @@ const MoveProxy = () => {
       toast.error('Both authentication tokens are required');
       return;
     }
+    if (!selectedEnvironment) {
+      toast.error("Please select an environment");
+      return;
+    }
     
     setIsLoading(true);
     
@@ -136,7 +153,7 @@ const MoveProxy = () => {
         proxyName: formData.proxyName,
         newProxyName: formData.newProxyName,
         revision: formData.revision,
-        environments: selectedEnvironments
+        environment: selectedEnvironment,
       });
       console.log('API response:', response); 
       if (response.success) {
@@ -377,58 +394,39 @@ const MoveProxy = () => {
                 </div>
 
                
-               {/* Updated Environments Section */}
-                <div className="space-y-3">
-                  <label className="text-sm font-medium text-gray-700">
-                    Environments
-                  </label>
-                
-                  <Select onValueChange={handleEnvironmentSelect}>
+               {/* ENVIRONMENT (single selection) */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Environment *</label>
+
+                  <Select
+                    disabled={!targetOrg}
+                    value={selectedEnvironment}
+                    onValueChange={setSelectedEnvironment}
+                  >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select environments to add" />
+                      <SelectValue placeholder="Select environment" />
                     </SelectTrigger>
                     <SelectContent>
-                      {availableEnvironments
-                        .filter(env => !selectedEnvironments.includes(env.name))
-                        .map((env) => (
-                          <SelectItem key={env.id} value={env.name}>
-                            <div>
-                              <div className="font-medium">{env.name}</div>
-                              <div className="text-xs text-gray-500">{env.type}</div>
-                            </div>
-                          </SelectItem>
-                        ))}
+                      {availableEnvironments.map(env => (
+                        <SelectItem key={env.id} value={env.name}>
+                          {env.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
-                  </Select>  
-                
-                  {/* Selected Environments Display */}
-                  {selectedEnvironments.length > 0 && (
-                    <div className="space-y-2">
-                      <p className="text-xs text-gray-600">Selected environments:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {selectedEnvironments.map((envName) => {
-                          const env = availableEnvironments.find(e => e.name === envName);
-                          return (
-                            <Badge 
-                              key={envName} 
-                              variant="outline" 
-                              className="flex items-center gap-1 bg-blue-50 text-blue-700 border-blue-200"
-                            >
-                              <span>{envName}</span>
-                              <button
-                                type="button"
-                                onClick={() => handleEnvironmentRemove(envName)}
-                                className="ml-1 hover:bg-blue-200 rounded-full p-0.5"
-                              >
-                                <X size={12} />
-                              </button>
-                            </Badge>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
+                  </Select>
 
+                  {selectedEnvironment && (
+                    <Badge className="flex items-center gap-1 w-fit">
+                      {selectedEnvironment}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedEnvironment("")}
+                        className="ml-1"
+                      >
+                        <X size={12} />
+                      </button>
+                    </Badge>
+                  )}
                   <p className="text-xs text-gray-500">
                     Select one or more environments for your proxy to be deployed to.
                   </p>
