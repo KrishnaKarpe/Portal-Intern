@@ -295,5 +295,24 @@ export const pushProductToGitlab = async (gitdata2) => {
   }
 };
 
+export const deployProxy = async (deployData) => {
+  try {
+    const response = await fetch(`${API_URL}/proxy/deploy`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(deployData),
+    }); 
+    const data = await response.json();
 
-// deployProxy  /proxy/deploy
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to deploy proxy');
+    }
+    return data;
+  }
+  catch (error) {
+    console.error('Error deploying proxy:', error);
+    throw error;
+  }
+}  

@@ -5,12 +5,15 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { MoveProxy as apiMoveProxy } from '@/services/api';
 import { fetchProxies } from '@/services/api'; // your function to get proxies
 import { useEffect } from 'react';  
+import { fetchLatestRevision } from '@/services/api';
+import { fetchDeploymentStatus } from '@/services/api';
 import { 
   Copy, 
   Building2, 
@@ -29,18 +32,15 @@ const organizations = [
 ];
 
 
-const availableEnvironments = [
-  { id: 1, name: 'apim-dev', type: 'Development' },
-  { id: 2, name: 'apim-uat-internal', type: 'UAT Internal' },
-  { id: 3, name: 'apim-uat-public', type: 'UAT Public' },
-]; 
-
 const MoveProxy = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(false);
   const [sourceOrg, setSourceOrg] = useState("");
   const [targetOrg, setTargetOrg] = useState("");
-  const [selectedEnvironments, setSelectedEnvironments] = useState<string[]>([]);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
+  const [proxyCheckStatus, setProxyCheckStatus] = useState<'idle' | 'checking' | 'found' | 'not_found' | 'error' | 'unknown'>('idle');
+  const [deploymentInfo, setDeploymentInfo] = useState<{environment: string, status: string, revision?: string}[]>([]);
   const [formData, setFormData] = useState({
     sourceToken: '',
     targetToken: '',
@@ -53,6 +53,57 @@ const MoveProxy = () => {
   const [allProxies, setAllProxies] = useState<string[]>([]); // full list
   const [proxySuggestions, setProxySuggestions] = useState<string[]>([]); // filtered list
   const [showProxySuggestions, setShowProxySuggestions] = useState(false);
+
+  const onFetchLatestRevision = async () => {
+    if (!sourceOrg || !formData.sourceToken || !formData.proxyName) {
+      toast.error('Provide source org, token, and proxy name first');
+      return;
+    }
+
+    try {
+      setIsFetching(true);
+      const latestRevision = await fetchLatestRevision({
+        sourceOrg,
+        proxyName: formData.proxyName,
+        sourceToken: formData.sourceToken,
+      });
+      setFormData((prev) => ({ ...prev, revision: latestRevision.toString() }));
+      toast.success(`Latest revision fetched: ${latestRevision}`);
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to fetch latest revision');
+    } finally {
+      setIsFetching(false);
+    }
+  };
+
+  const onFetchDeploymentStatus = async () => {
+    if (!sourceOrg || !formData.sourceToken || !formData.proxyName) {
+      toast.error('Provide Apigee org, token, and proxy name first');
+      return;
+    }
+
+    try {
+      setIsCheckingStatus(true);
+      setProxyCheckStatus('checking');
+      const deployments = await fetchDeploymentStatus({
+        sourceOrg: sourceOrg,
+        proxyName: formData.proxyName,
+        sourceToken: formData.sourceToken,
+      });
+      if (deployments && deployments.length > 0) {
+        setProxyCheckStatus('found');
+        setDeploymentInfo(deployments);
+      } else {
+        setProxyCheckStatus('not_found');
+        setDeploymentInfo([]);
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to fetch deployment status');
+      setProxyCheckStatus('error');
+    } finally {
+      setIsCheckingStatus(false);
+    }
+  };
 
   // <-- Add it here, with your other handlers
   const handleProxyNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -78,16 +129,7 @@ const MoveProxy = () => {
       [name]: value,
     }));
   };
-//dsfhddj
-   const handleEnvironmentSelect = (environmentName: string) => {
-    if (!selectedEnvironments.includes(environmentName)) {
-      setSelectedEnvironments([...selectedEnvironments, environmentName]);
-    }
-  }; 
 
-  const handleEnvironmentRemove = (environmentName: string) => {
-    setSelectedEnvironments(selectedEnvironments.filter(env => env !== environmentName));
-  }; 
 
   useEffect(() => {
     if (sourceOrg && formData.sourceToken?.trim()) {
@@ -105,6 +147,10 @@ const MoveProxy = () => {
         });
     }
   }, [sourceOrg, formData.sourceToken]);
+
+
+ 
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -125,6 +171,7 @@ const MoveProxy = () => {
       return;
     }
     
+    
     setIsLoading(true);
     
     try {
@@ -136,7 +183,6 @@ const MoveProxy = () => {
         proxyName: formData.proxyName,
         newProxyName: formData.newProxyName,
         revision: formData.revision,
-        environments: selectedEnvironments
       });
       console.log('API response:', response); 
       if (response.success) {
@@ -147,7 +193,9 @@ const MoveProxy = () => {
             sourceOrg,
             targetOrg,
             originalProxyName: formData.proxyName,
-            newProxyName: formData.newProxyName
+            newProxyName: formData.newProxyName,
+            targetToken: formData.targetToken,
+            revision: formData.revision,
           }
         });
       } else {
@@ -325,28 +373,61 @@ const MoveProxy = () => {
                     <label className="text-sm font-medium text-gray-700">
                       Existing Proxy Name *
                     </label>
-                    <div className="relative">
-                      <Input
-                        name="proxyName"
-                        placeholder="Existing proxy in Apigee"
-                        value={formData.proxyName}
-                        onChange={handleProxyNameChange}
-                      />
-                      {showProxySuggestions && proxySuggestions.length > 0 && (
-                        <ul className="absolute z-10 w-full bg-white border border-gray-300 mt-1 max-h-48 overflow-y-auto rounded-md shadow-lg">
-                          {proxySuggestions.map((p, i) => (
-                            <li
-                              key={i}
-                              className="px-3 py-2 hover:bg-blue-100 cursor-pointer"
-                              onClick={() => {
-                                setFormData(prev => ({ ...prev, proxyName: p }));
-                                setShowProxySuggestions(false);
-                              }}
-                            >
-                              {p}
-                            </li>
-                          ))}
-                        </ul>
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        <div className="relative w-full">
+                          <Input
+                            name="proxyName"
+                            placeholder="Existing proxy in Apigee"
+                            value={formData.proxyName}
+                            onChange={handleProxyNameChange}
+                          />
+                          {showProxySuggestions && proxySuggestions.length > 0 && (
+                            <ul className="absolute z-10 w-full bg-white border border-gray-300 mt-1 max-h-48 overflow-y-auto rounded-md shadow-lg">
+                              {proxySuggestions.map((p, i) => (
+                                <li
+                                  key={i}
+                                  className="px-3 py-2 hover:bg-blue-100 cursor-pointer"
+                                  onClick={() => {
+                                    setFormData(prev => ({ ...prev, proxyName: p }));
+                                    setShowProxySuggestions(false);
+                                  }}
+                                >
+                                  {p}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={onFetchDeploymentStatus}
+                          disabled={isCheckingStatus}
+                          className="bg-blue-300 text-blue-900 hover:bg-blue-400 active:bg-blue-500 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-400"
+                        >
+                          {isCheckingStatus ? 'Checking…' : 'Check Status'}
+                        </Button>
+                      </div>
+                      {proxyCheckStatus !== 'idle' && (
+                        <Badge
+                          variant="secondary"
+                          className={
+                            proxyCheckStatus === 'found'
+                              ? 'bg-green-100 text-green-800'
+                              : proxyCheckStatus === 'not_found'
+                              ? 'bg-red-100 text-red-800'
+                              : proxyCheckStatus === 'checking'
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-amber-100 text-amber-800'
+                          }
+                        >
+                          {proxyCheckStatus === 'found' && 'Found'}
+                          {proxyCheckStatus === 'not_found' && 'Not Found'}
+                          {proxyCheckStatus === 'checking' && 'Checking...'}
+                          {proxyCheckStatus === 'error' && 'Error'}
+                          {proxyCheckStatus === 'unknown' && 'Unknown'}
+                        </Badge>
                       )}
                     </div>
                   </div>
@@ -363,77 +444,84 @@ const MoveProxy = () => {
                     />
                   </div>
                 </div>
+              </div>
+                {/* Deployment Status Section */}
+                {proxyCheckStatus === 'not_found' && (
+                  <div className="mt-4 p-4 rounded-lg" style={{backgroundColor: '#E8F0FE', border: '1px solid #4285F4'}}>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full" style={{backgroundColor: '#4285F4'}}></div>
+                      <span className="font-medium" style={{color: '#4285F4'}}>Not Present</span>
+                    </div>
+                    <p className="text-sm mt-1" style={{color: '#4285F4'}}>Proxy not found in the selected organization</p>
+                  </div>
+                )}
+
+                 {proxyCheckStatus === 'found' && deploymentInfo.length > 0 && (
+                  <div className="mt-4">
+                    <h4 className="text-sm font-medium mb-3" style={{color: '#4285F4'}}>Apigee Deployment Status</h4>
+                    <div className="rounded-lg overflow-hidden" style={{border: '1px solid #4285F4'}}>
+                      <Table>
+                        <TableHeader style={{backgroundColor: '#E8F0FE'}}>
+                          <TableRow>
+                            <TableHead className="w-1/3" style={{color: '#4285F4'}}>Environment</TableHead>
+                            <TableHead className="w-1/3" style={{color: '#4285F4'}}>Revision</TableHead>
+                            <TableHead className="w-1/3" style={{color: '#4285F4'}}>Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {deploymentInfo.map((deployment, index) => (
+                            <TableRow key={index} style={{backgroundColor: 'rgba(232, 240, 254, 0.3)'}}>
+                              <TableCell className="font-medium">{deployment.environment}</TableCell>
+                              <TableCell>{deployment.revision || '-'}</TableCell>
+                              <TableCell>
+                                <Badge 
+                                  variant={deployment.status === 'Deployed' ? 'default' : 'secondary'}
+                                  className={
+                                    deployment.status === 'Deployed' 
+                                      ? 'bg-green-100 text-green-800' 
+                                      : 'bg-gray-100 text-gray-800'
+                                  }
+                                >
+                                  {deployment.status}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-700">
                     Revision
                   </label>
-                  <Input
-                    name="revision"
-                    placeholder="Enter Revision"
-                    value={formData.revision}
-                    onChange={handleChange}
-                  />
+                  <div className="flex items-center gap-2">
+                    <Input
+                      name="revision"
+                      placeholder="Press Fetch to get the latest revision"
+                      value={formData.revision}
+                      onChange={handleChange}
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={onFetchLatestRevision}
+                      disabled={isFetching}
+                      className="bg-blue-300 text-blue-900 hover:bg-blue-400 active:bg-blue-500 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    >
+                      {isFetching ? 'Fetching…' : 'Fetch'}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    Fetch fills the latest deployed revision from your source org.
+                  </p>
                 </div>
 
                
-               {/* Updated Environments Section */}
-                <div className="space-y-3">
-                  <label className="text-sm font-medium text-gray-700">
-                    Environments
-                  </label>
-                
-                  <Select onValueChange={handleEnvironmentSelect}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select environments to add" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableEnvironments
-                        .filter(env => !selectedEnvironments.includes(env.name))
-                        .map((env) => (
-                          <SelectItem key={env.id} value={env.name}>
-                            <div>
-                              <div className="font-medium">{env.name}</div>
-                              <div className="text-xs text-gray-500">{env.type}</div>
-                            </div>
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>  
-                
-                  {/* Selected Environments Display */}
-                  {selectedEnvironments.length > 0 && (
-                    <div className="space-y-2">
-                      <p className="text-xs text-gray-600">Selected environments:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {selectedEnvironments.map((envName) => {
-                          const env = availableEnvironments.find(e => e.name === envName);
-                          return (
-                            <Badge 
-                              key={envName} 
-                              variant="outline" 
-                              className="flex items-center gap-1 bg-blue-50 text-blue-700 border-blue-200"
-                            >
-                              <span>{envName}</span>
-                              <button
-                                type="button"
-                                onClick={() => handleEnvironmentRemove(envName)}
-                                className="ml-1 hover:bg-blue-200 rounded-full p-0.5"
-                              >
-                                <X size={12} />
-                              </button>
-                            </Badge>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  <p className="text-xs text-gray-500">
-                    Select one or more environments for your proxy to be deployed to.
-                  </p>
-                </div>
-              </div> 
+               
     
 
               {/* Submit Button */}

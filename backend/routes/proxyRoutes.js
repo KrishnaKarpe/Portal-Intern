@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const {
     cloneProxy,
+    deployproxy,
     getAllProxies
 } = require('../controllers/ProxyController');
 //const { validateCloneProxy } = require('../middleware/validation');
