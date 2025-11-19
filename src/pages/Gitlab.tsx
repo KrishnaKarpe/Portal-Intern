@@ -114,8 +114,8 @@ const Gitlab: React.FC = () => {
       toast.error('Provide Apigee token, proxy name and revision');
       return;
     }
-    if (!formData.gitlabAccessToken || !formData.gitlabGroupName) {
-      toast.error('Provide GitLab token and group name');
+    if (!formData.gitlabAccessToken) {
+      toast.error('Provide GitLab token');
       return;
     }
     try {
@@ -466,14 +466,14 @@ const Gitlab: React.FC = () => {
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700">Group Name *</label>
                     <Select
-                      value={formData.template}
-                      onValueChange={(value) => setFormData((prev) => ({ ...prev, template: value }))}
+                      value={formData.gitlabGroupName}
+                      onValueChange={(value) => setFormData((prev) => ({ ...prev, gitlabGroupName: value }))}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Select template" />
+                        <SelectValue placeholder="Select group" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="apigee-cicd">Apiproxy</SelectItem>
+                        <SelectItem value="Apiproxy">Apiproxy</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
