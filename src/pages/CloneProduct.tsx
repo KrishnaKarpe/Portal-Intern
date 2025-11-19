@@ -52,7 +52,7 @@ const CloneProduct = () => {
   const [sourceOrg, setSourceOrg] = useState("");
   const [targetOrg, setTargetOrg] = useState("");
   const [availableEnvironments, setAvailableEnvironments] = useState([]);
-  const [selectedEnvironment, setSelectedEnvironment] = useState("");
+  const [selectedEnvironments, setSelectedEnvironments] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     sourceToken: '',
     targetToken: '',
@@ -73,7 +73,7 @@ const CloneProduct = () => {
   // Update environments when target org changes
     useEffect(() => {
       setAvailableEnvironments(getAvailableEnvironments(targetOrg));
-      setSelectedEnvironment(""); // reset env
+      setSelectedEnvironments([]); // reset environments on org change
     }, [targetOrg]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -94,10 +94,7 @@ const CloneProduct = () => {
       toast.error('Both authentication tokens are required');
       return;
     }
-    if (!selectedEnvironment) {
-          toast.error("Please select an environment");
-          return;
-    }
+
         
     
     setIsLoading(true);
@@ -112,7 +109,7 @@ const CloneProduct = () => {
         newProductName: formData.newProductName,
         newDisplayName: formData.newDisplayName,
         description: formData.description,
-        environment: selectedEnvironment,
+        environments: selectedEnvironments,
       });
 
       if (response.success) {
@@ -346,45 +343,62 @@ const CloneProduct = () => {
                     className="min-h-[80px] resize-none"
                   />
                 </div>
+              </div>
 
-                {/* ENVIRONMENT (single selection) */}
+              {/* ENVIRONMENT (multiple selection) */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Environment *</label>
+                  <label className="text-sm font-medium">Environments *</label>
 
-                  <Select
-                    disabled={!targetOrg}
-                    value={selectedEnvironment}
-                    onValueChange={setSelectedEnvironment}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select environment" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableEnvironments.map(env => (
-                        <SelectItem key={env.id} value={env.name}>
-                          {env.name}
-                        </SelectItem>
+                  <div className="grid gap-2 md:grid-cols-3">
+                    {!availableEnvironments.length && (
+                      <div className="text-sm text-gray-500">Select a target organization to see environments.</div>
+                    )}
+                    {availableEnvironments.map(env => {
+                      const selected = selectedEnvironments.includes(env.name);
+                      return (
+                        <button
+                          key={env.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedEnvironments(prev =>
+                              prev.includes(env.name)
+                                ? prev.filter(e => e !== env.name) 
+                                : [...prev, env.name]
+                            );
+                          }}
+                          className={`px-3 py-2 rounded-lg border text-sm text-left w-full transition-colors ${
+                            selected ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200'
+                          }`}
+                          disabled={!targetOrg}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>{env.name}</div>                          
+                            <div className="text-xs text-gray-400">{env.type}</div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {selectedEnvironments.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {selectedEnvironments.map(env => (
+                        <Badge key={env} className="flex items-center gap-2">
+                          {env}
+                          <button
+                            type="button"
+                            onClick={() => setSelectedEnvironments(prev => prev.filter(e => e !== env))}
+                            className="ml-1"
+                          >
+                            <X size={12} />
+                          </button>
+                        </Badge>
                       ))}
-                    </SelectContent>
-                  </Select>
-
-                  {selectedEnvironment && (
-                    <Badge className="flex items-center gap-1 w-fit">
-                      {selectedEnvironment}
-                      <button
-                        type="button"
-                        onClick={() => setSelectedEnvironment("")}
-                        className="ml-1"
-                      >
-                        <X size={12} />
-                      </button>
-                    </Badge>
+                    </div>
                   )}
                   <p className="text-xs text-gray-500">
-                    Select one or more environments for your proxy to be deployed to.
+                    Select one or more environments for your product to be cloned into.
                   </p>
                 </div>
-              </div> 
 
               {/* Submit Button */}
               <div className="pt-4 border-t">
