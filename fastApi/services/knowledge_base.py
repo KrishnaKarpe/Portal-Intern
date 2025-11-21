@@ -5,7 +5,7 @@ import os
 import json
 import logging
 from typing import Dict, Any
-from langchain_community.vectorstores import Chroma
+from langchain_chroma import Chroma 
 from langchain.chains import RetrievalQA
 from langchain.schema import Document
 from services.llm import LLMService

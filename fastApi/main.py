@@ -139,4 +139,4 @@ if __name__ == "__main__":
     print("🚀 Starting Apigee AI Assistant (Clean & Simplified)")
     print(f"📚 Vector store: {'Ready' if knowledge_service.is_ready() else 'Not available'}")
     print(f"🤖 Agents: {'Ready' if ask_agent.is_ready() and agent_mode.is_ready() else 'Not ready'}")
-    uvicorn.run(app, host="0.0.0.0", port=8001, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8001, reload=True)

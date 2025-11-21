@@ -90,7 +90,7 @@ def build_xml_prompt(spec_or_instruction: str) -> str:
     The LLM MUST output ONLY XML (and policy XML blocks) — no extra explanation.
     Contains 3 examples: VerifyAPIKey, SpikeArrest multi-route, JavaScript transform.
     """
-    prompt = f"""
+    prompt = """
 You are an expert Apigee API designer. Given a proxy specification or instruction, generate ONLY the XML configuration blocks below:
 1) <APIProxy> main descriptor
 2) <ProxyEndpoint> named "default"
