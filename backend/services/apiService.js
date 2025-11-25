@@ -409,10 +409,10 @@ const createGitlabProjectforProxy = async (proxyName, token) => {
       'https://gitlab.com/api/v4/projects',
       {
         name: proxyName,
-        namespace_id:  123,    //STATIC VALUE
-        group_with_project_templates_id : 123,     //STATIC VALUE
+        namespace_id: 103848084 ,    //STATIC VALUE
+        group_with_project_templates_id : 105265772,     //STATIC VALUE
         use_custom_template: true,
-        template_project_id :  123      //Static Value
+        template_project_id : 68728494
       },
       {
         headers: { 
@@ -472,7 +472,7 @@ const sendProxyToGitlab = async (proxyName, token, proxyBundle) => {
 
     const baseBranch = "prod-public";
     const uploadBranch = "dev" ;
-    const requiredBranches = ["dev", "uat", "prod-public"];
+    const requiredBranches = ["dev", "uat-public", "prod-public"];
 
     // Step 2: Ensure required branches exist
     for (const itbranch of requiredBranches) {
