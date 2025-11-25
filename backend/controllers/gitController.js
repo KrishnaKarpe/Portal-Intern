@@ -23,6 +23,7 @@ const gitProxy = async (req, res) => {
       proxyName,
       revision,
       gitToken,
+      commitmessage,
     } = req.body;
 
     if (!sourceOrg || !sourceToken || !proxyName || !revision || !gitToken  ) {
@@ -46,7 +47,7 @@ const gitProxy = async (req, res) => {
     
     // Step 2: Import proxy to git
     console.log('Step 2: importing proxy to git...');
-    const gitResult = await sendProxyToGitlab(proxyName, gitToken, proxyBundle);
+    const gitResult = await sendProxyToGitlab(proxyName, gitToken, proxyBundle, commitmessage);
 
     return res.status(200).json({
       success: true,

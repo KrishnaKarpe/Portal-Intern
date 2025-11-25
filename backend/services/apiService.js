@@ -439,7 +439,7 @@ const createGitlabProjectforProxy = async (proxyName, token) => {
  * @param {Array} environments - Environments to set up in the new project (if created)
  * @returns {Promise<Object>} - Upload response { success, projectId, username, gitlabProjectUrl }
  */
-const sendProxyToGitlab = async (proxyName, token, proxyBundle) => {
+const sendProxyToGitlab = async (proxyName, token, proxyBundle, commitmessage) => {
   try {
     console.log(`🔍 Checking for GitLab project: ${proxyName}`);
 
@@ -554,7 +554,7 @@ const sendProxyToGitlab = async (proxyName, token, proxyBundle) => {
       commitUrl,
       {
         branch: uploadBranch,
-        commit_message: `Upload all proxgit statusy files for ${proxyName} by ${usernameToUse}`,
+        commit_message: `${commitmessage} ${proxyName} -  by ${usernameToUse}`,
         actions,
       },
       { headers: { 'PRIVATE-TOKEN': token } }
