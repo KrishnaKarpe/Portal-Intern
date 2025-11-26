@@ -385,7 +385,7 @@ const DeployProxyinOrg = async (targetOrgId, newProxyName, token, environment) =
  * @returns {Promise<number>} - Project ID
  */
 const getGitlabProjectId = async (proxyName, token) => {
-  const response = await axios.get('https://gitlab.com/api/v4/projects', {
+  const response = await axios.get('https://gitlab.com/api/v4/groups/103848084/projects', {
     headers: { 'PRIVATE-TOKEN': token },
     params: { search: proxyName }
   });
@@ -439,7 +439,7 @@ const createGitlabProjectforProxy = async (proxyName, token) => {
  * @param {Array} environments - Environments to set up in the new project (if created)
  * @returns {Promise<Object>} - Upload response { success, projectId, username, gitlabProjectUrl }
  */
-const sendProxyToGitlab = async (proxyName, token, proxyBundle, commitmessage) => {
+const sendProxyToGitlab = async (proxyName, token, proxyBundle) => {
   try {
     console.log(`🔍 Checking for GitLab project: ${proxyName}`);
 
@@ -554,7 +554,7 @@ const sendProxyToGitlab = async (proxyName, token, proxyBundle, commitmessage) =
       commitUrl,
       {
         branch: uploadBranch,
-        commit_message: `${commitmessage} ${proxyName} -  by ${usernameToUse}`,
+        commit_message: `Commit ${proxyName} -  by ${usernameToUse}`,
         actions,
       },
       { headers: { 'PRIVATE-TOKEN': token } }
