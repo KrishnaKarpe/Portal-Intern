@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ChevronsLeft, ChevronsRight, Layers, RefreshCw, List, Package, GitBranch, UploadCloud, Boxes, ShoppingBag } from 'lucide-react';
+import { ChevronsLeft, ChevronsRight, Layers, RefreshCw, List, Package, GitBranch, UploadCloud, Boxes, ShoppingBag, GitCompare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const menuItems = [
@@ -45,6 +45,11 @@ const menuItems = [
     name: 'List All Products',
     path: '/list-products',
     icon: <ShoppingBag className="h-5 w-5 mr-3" />,
+  },
+  {
+    name: 'Compare Proxies',
+    path: '/compare-proxies',
+    icon: <GitCompare className="h-5 w-5 mr-3" />,
   },
 ];
 

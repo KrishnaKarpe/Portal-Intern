@@ -56,6 +56,7 @@ const Gitlab: React.FC = () => {
     apigeeToken: '',
     proxyName: '',
     revision: '',
+    commitMessage: '',
   });
 
 
@@ -136,6 +137,7 @@ const Gitlab: React.FC = () => {
         branch: selectedBranch ,
         template: formData.template,
         environments: selectedEnvironments,
+        commitMessage: formData.commitMessage,
       };
       
       // Simulate API call delay
@@ -544,6 +546,18 @@ const Gitlab: React.FC = () => {
                     </div>
                     <p className="text-xs text-gray-500">Select environments to create for new project in GitLab</p>
                   </div>
+                </div>
+
+                {/* Commit Message */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Commit Message</label>
+                  <Input 
+                    name="commitMessage" 
+                    placeholder="Describe what changed or leave empty for auto-generated message." 
+                    value={formData.commitMessage} 
+                    onChange={handleChange}
+                  />
+                  {/* <p className="text-xs text-gray-500">If left empty, default message will be used</p> */}
                 </div>
               </div>
 

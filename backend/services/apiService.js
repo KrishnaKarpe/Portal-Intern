@@ -462,10 +462,10 @@ const createGitlabProjectforProxy = async (proxyName, token) => {
  * @param {string} proxyName - Proxy name / GitLab project name
  * @param {string} token - GitLab access token
  * @param {Buffer} proxyBundle - Proxy bundle binary (zip)
- * @param {Array} environments - Environments to set up in the new project (if created)
+ * @param {string} commitMessage - Optional commit message from user
  * @returns {Promise<Object>} - Upload response { success, projectId, username, gitlabProjectUrl }
  */
-const sendProxyToGitlab = async (proxyName, token, proxyBundle) => {
+const sendProxyToGitlab = async (proxyName, token, proxyBundle, commitMessage) => {
   try {
     console.log(`🔍 Checking for GitLab project: ${proxyName}`);
 
@@ -576,11 +576,16 @@ const sendProxyToGitlab = async (proxyName, token, proxyBundle) => {
 
     const commitUrl = `https://gitlab.com/api/v4/projects/${projectId}/repository/commits`;
 
+    // Use custom commit message if provided, otherwise use default
+    const finalCommitMessage = commitMessage && commitMessage.trim() 
+      ? `${commitMessage.trim()} ${proxyName} - by ${usernameToUse}`
+      : `${proxyName} - by ${usernameToUse}`;
+
     const commitResp = await axios.post(
       commitUrl,
       {
         branch: uploadBranch,
-        commit_message: `Commit ${proxyName} -  by ${usernameToUse}`,
+        commit_message: finalCommitMessage,
         actions,
       },
       { headers: { 'PRIVATE-TOKEN': token } }
