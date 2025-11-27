@@ -7,6 +7,7 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 const AdmZip = require('adm-zip');
+const JSZip = require('jszip');
 
 /**
  * Fetch a single product from an organization using Apigee API
@@ -295,9 +296,10 @@ const fetchLatestRevision = async (orgId, proxyName, token) => {
  * @param {string} proxyName - New proxy name
  * @param {string} token - Authentication token
  * @param {Object} proxyBundle - Proxy bundle data
+ * @param {string} basepath - Base path for the proxy
  * @returns {Promise<Object>} - Created proxy data
  */
-const SendProxyToOrg = async (orgId, proxyName, token, proxyBundle) => {
+const SendProxyToOrg = async (orgId, proxyName, token, proxyBundle, basepath) => {
   console.log(`Importing proxy ${proxyName} to organization ${orgId}`);
 
   if (!token || token.trim() === '') {
@@ -305,6 +307,30 @@ const SendProxyToOrg = async (orgId, proxyName, token, proxyBundle) => {
   }
 
   try {
+    let updatedBundle = proxyBundle;
+    
+    // If basepath is provided, update the BasePath in default.xml
+    if (basepath) {
+      // 1. Unzip bundle
+      const zip = await JSZip.loadAsync(proxyBundle);
+
+      // 2. Read default.xml
+      const xmlPath = "apiproxy/proxies/default.xml";
+      let defaultXml = await zip.file(xmlPath).async("string");
+
+      // 3. Replace BasePath
+      defaultXml = defaultXml.replace(
+        /<BasePath>.*<\/BasePath>/,
+        `<BasePath>/${basepath}</BasePath>`
+      );
+
+      // 4. Update file in ZIP
+      zip.file(xmlPath, defaultXml);
+
+      // 5. Rebuild ZIP
+      updatedBundle = await zip.generateAsync({ type: "nodebuffer" });
+    }
+
     //create the proxy
     const createResponse = await axios({
       method: 'POST',
@@ -313,7 +339,7 @@ const SendProxyToOrg = async (orgId, proxyName, token, proxyBundle) => {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/octet-stream'
       },
-      data: proxyBundle,
+      data: updatedBundle,
       timeout: 30000 // Longer timeout for proxy import
     });
 

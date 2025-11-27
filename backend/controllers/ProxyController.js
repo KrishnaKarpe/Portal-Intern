@@ -23,6 +23,7 @@ const cloneProxy = async (req, res) => {
       proxyName,
       newProxyName,
       revision,
+      basePath,
     } = req.body;
 
     if (!sourceOrg || !targetOrg || !sourceToken || !targetToken || !proxyName || !newProxyName || !revision) {
@@ -44,7 +45,7 @@ const cloneProxy = async (req, res) => {
       });
     }    // Step 2: Import proxy to target organization
     console.log('Step 2: importing proxy in target org...');
-    const importResult = await SendProxyToOrg(targetOrg, newProxyName, targetToken, proxyBundle);
+    const importResult = await SendProxyToOrg(targetOrg, newProxyName, targetToken, proxyBundle, basePath);
 
     return res.status(200).json({
       success: true,
