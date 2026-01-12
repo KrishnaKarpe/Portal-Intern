@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { fetchLatestRevision, fetchDeploymentStatus, fetchProxies } from '@/services/api';
 import { toast } from 'sonner';
 import { GitCompare, Shield, RefreshCw, Gauge, CheckCircle2, XCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const organizations = [
   { id: 1, name: 'apigee-prod-ouax', type: 'Production' },
@@ -15,6 +16,7 @@ const organizations = [
 ];
 
 const CompareProxies: React.FC = () => {
+  const navigate = useNavigate();
   const [sourceOrg, setSourceOrg] = useState('');
   const [authToken, setAuthToken] = useState('');
   const [proxyName, setProxyName] = useState('');
@@ -392,8 +394,18 @@ const CompareProxies: React.FC = () => {
                       toast.error('Please provide proxy name and both revisions to compare');
                       return;
                     }
-                    // TODO: Implement comparison logic
-                    toast.info(`Comparing revision ${revision1} and ${revision2} of ${proxyName}`);
+                    // Navigate to success page with comparison data
+                    navigate('/compare-proxies-success', {
+                      state: {
+                        proxyName,
+                        sourceOrg,
+                        revision1: revision1.trim(),
+                        revision2: revision2.trim(),
+                        authToken,
+                        latestRevision,
+                        deploymentInfo
+                      }
+                    });
                   }}
                   disabled={!proxyName || !revision1.trim() || !revision2.trim()}
                   className="w-full bg-blue-600 hover:bg-blue-700"
