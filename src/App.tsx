@@ -15,6 +15,7 @@ import CloneproxySuccess from "./pages/CloneproxySuccess";
 import Gitlab from "./pages/Gitlab";
 import GitlabProduct from "./pages/GitlabProduct";
 import CompareProxies from "./pages/CompareProxies";
+import CompareProxiesSuccess from "./pages/CompareProxiesSuccess";
 
 const queryClient = new QueryClient();
 
@@ -37,6 +38,7 @@ const App = () => {
             <Route path="/gitlab" element={<MainLayout><Gitlab /></MainLayout>} />
             <Route path="/gitlab-product" element={<MainLayout><GitlabProduct /></MainLayout>} />
             <Route path="/compare-proxies" element={<MainLayout><CompareProxies /></MainLayout>} />
+            <Route path="/compare-proxies-success" element={<MainLayout><CompareProxiesSuccess /></MainLayout>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
