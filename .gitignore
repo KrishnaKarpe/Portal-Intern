@@ -23,96 +23,99 @@ dist-ssr
 *.sln
 *.sw?
 
-# FastAPI / Python
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
 *.egg-info/
-.installed.cfg
 *.egg
-MANIFEST
 
-# Virtual environments
-.env
-.venv
-env/
+# Virtual Environments
 venv/
+env/
 ENV/
-env.bak/
-venv.bak/
-.conda/
+new_venv/
+fastApi/new_venv/
 
-# Environment variables
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# Environment Variables & Secrets
+.env
+.env.*
+!.env.example
 
-# API Keys and secrets
-*.key
-*.pem
-secrets/
-.secrets
+# IDE & Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
 
-# FastAPI specific
-fastapi.log
-uvicorn.log
+# Apigee Specific
+apigee-*.json
+apigee-config.json
+proxy_bundles/
+apiproxy_*.zip
+generated_proxies/
 
-# Documentation and data processing
-processed_docs/
-raw_docs/
-*.pdf
-*.docx
-*.doc
+# Vector Store & Knowledge Base (IMPORTANT)
 chroma_db/
-*.db
-*.sqlite
-*.sqlite3
+faiss_index/
+*.faiss
+*.pkl
+*.pickle
+processed_docs/
+policy_docs.json
 
-# Compressed files
-*.zip
-*.tar.gz
-*.rar
-*.7z
-*.bz2
-*.xz
+# Logs
+logs/
+*.log
 
-# Jupyter Notebooks
-.ipynb_checkpoints
+# Temporary Files
+tmp/
+temp/
+*.tmp
 
-# pytest
+# Node.js (Frontend)
+node_modules/
+dist/
+dist-ssr/
+
+# Streamlit
+.streamlit/secrets.toml
+.streamlit/config.toml
+
+# Testing
 .pytest_cache/
 .coverage
 htmlcov/
 
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
+# Databases
+*.db
+*.sqlite
+*.sqlite3
 
-# AI/ML models
-*.model
-*.pkl
-*.pickle
+# Credentials
+credentials.json
+secrets.json
+*.pem
+*.key
+
+# OS Files
+Thumbs.db
+Desktop.ini
+
+# Backup & Archives
+*.bak
+*.backup
+*.zip
+*.tar.gz
+*.rar
+
+# Large Model Files
+*.bin
+*.safetensors
 models/
-embeddings/
 
-# Temporary files
-*.tmp
-*.temp
-.temp/
-temp/
+# Documentation builds
+docs/_build/
+site/
