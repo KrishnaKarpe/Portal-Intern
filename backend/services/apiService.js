@@ -1,7 +1,7 @@
 /**
  * API Service - Handles external API communication
- * Responsible for making requests to the Apigee API
- */
+  * Responsible for making requests to the Apigee API
+    */
 
 const axios = require('axios');
 const fs = require('fs');
@@ -206,13 +206,13 @@ const fetchProxyFromOrg = async (orgId, proxyName, token, revision) => {
       url: `https://apigee.googleapis.com/v1/organizations/${orgId}/apis/${proxyName}/revisions/${revision}?format=bundle`,
       headers: {
         'Authorization': `Bearer ${token}`,
-        
+
       },
       responseType: 'arraybuffer', // Use arraybuffer to handle binary data
       timeout: 30000 // Longer timeout for proxy bundles
     });
-    
-    
+
+
     console.log(`Successfully fetched proxy bundle for ${proxyName}`);
 
     return response.data;
@@ -308,7 +308,7 @@ const SendProxyToOrg = async (orgId, proxyName, token, proxyBundle, basepath) =>
 
   try {
     let updatedBundle = proxyBundle;
-    
+
     // If basepath is provided, update the BasePath in default.xml
     if (basepath) {
       // 1. Unzip bundle
@@ -435,14 +435,14 @@ const createGitlabProjectforProxy = async (proxyName, token) => {
       'https://gitlab.com/api/v4/projects',
       {
         name: proxyName,
-        namespace_id: 103848084 ,    //STATIC VALUE
-        group_with_project_templates_id : 105265772,     //STATIC VALUE
+        namespace_id: 103848084,    //STATIC VALUE
+        group_with_project_templates_id: 105265772,     //STATIC VALUE
         use_custom_template: true,
-        template_project_id : 68728494
+        template_project_id: 68728494
       },
       {
-        headers: { 
-          'PRIVATE-TOKEN': token ,
+        headers: {
+          'PRIVATE-TOKEN': token,
           'Content-Type': 'application/json'
         },
       }
@@ -497,7 +497,7 @@ const sendProxyToGitlab = async (proxyName, token, proxyBundle, commitMessage) =
     }
 
     const baseBranch = "prod-public";
-    const uploadBranch = "dev" ;
+    const uploadBranch = "dev";
     const requiredBranches = ["dev", "uat-public", "prod-public"];
 
     // Step 2: Ensure required branches exist
@@ -518,9 +518,7 @@ const sendProxyToGitlab = async (proxyName, token, proxyBundle, commitMessage) =
       }
     }
 
-
-
-     // Step 3: Upload files
+    // Step 3: Upload files
     // Fetch project info
     let gitlabProjectUrl;
     try {
@@ -537,7 +535,7 @@ const sendProxyToGitlab = async (proxyName, token, proxyBundle, commitMessage) =
     const entries = zip.getEntries();
     console.log(`📦 Preparing to upload ${entries.length} files...`);
 
-    const actions=[];
+    const actions = [];
     for (const entry of entries) {
       if (entry.isDirectory) continue;
 
@@ -577,7 +575,7 @@ const sendProxyToGitlab = async (proxyName, token, proxyBundle, commitMessage) =
     const commitUrl = `https://gitlab.com/api/v4/projects/${projectId}/repository/commits`;
 
     // Use custom commit message if provided, otherwise use default
-    const finalCommitMessage = commitMessage && commitMessage.trim() 
+    const finalCommitMessage = commitMessage && commitMessage.trim()
       ? `${commitMessage.trim()} ${proxyName} - by ${usernameToUse}`
       : `${proxyName} - by ${usernameToUse}`;
 
@@ -637,8 +635,8 @@ const getGitUser = async (token) => {
   } catch (error) {
     console.error('Error fetching git user:', error.response?.data || error.message);
     throw error;
-  } 
-}; 
+  }
+};
 
 
 /**
@@ -708,7 +706,7 @@ const fetchProxyDeployments = async (orgId, proxyName, token) => {
  * @param {string} sourceOrg - Source organization ID
  * @returns {Promise<Array>} - List of proxy names
  */
-const fetchAllProxies = async (sourceOrg,token) => {
+const fetchAllProxies = async (sourceOrg, token) => {
   const url = `https://apigee.googleapis.com/v1/organizations/${sourceOrg}/apis`;
 
   const res = await axios.get(url, {
@@ -737,14 +735,14 @@ const createGitlabProjectforProduct = async (productName, token) => {
       'https://gitlab.com/api/v4/projects',
       {
         name: productName,
-        namespace_id: 105945867 ,    //STATIC VALUE
-        group_with_project_templates_id : 106119093,     //STATIC VALUE
+        namespace_id: 105945867,    //STATIC VALUE
+        group_with_project_templates_id: 106119093,     //STATIC VALUE
         use_custom_template: true,
-        template_project_id : 69176428       //Static Value
+        template_project_id: 69176428       //Static Value
       },
       {
-        headers: { 
-          'PRIVATE-TOKEN': token ,
+        headers: {
+          'PRIVATE-TOKEN': token,
           'Content-Type': 'application/json'
         },
       }
@@ -757,10 +755,10 @@ const createGitlabProjectforProduct = async (productName, token) => {
   }
 };
 
-const pushProductToGitlab = async (productName, token, productData, environments = [] ) => {
+const pushProductToGitlab = async (productName, token, productData, environments = []) => {
   try {
     console.log(`🔍 Checking for GitLab project: ${productName}`);
-    
+
     // Get username
     let usernameToUse;
     try {
@@ -790,11 +788,11 @@ const pushProductToGitlab = async (productName, token, productData, environments
     }
 
     const baseBranch = "prod";
-    const uploadBranch = "dev" ;
+    const uploadBranch = "dev";
 
     // Step 2: Ensure branches exist
     //check if selected branch exists
-    try {    
+    try {
       await axios.get(
         `https://gitlab.com/api/v4/projects/${projectId}/repository/branches/${encodeURIComponent(uploadBranch)}`,
         { headers: { 'PRIVATE-TOKEN': token } }
@@ -803,12 +801,12 @@ const pushProductToGitlab = async (productName, token, productData, environments
       console.log(`✅ Branch '${uploadBranch}' exists`);
     } catch {    //if not exist create from prod
       console.log(`⚠️ Branch '${uploadBranch}' missing — creating from '${baseBranch}'`);
-      
+
       await axios.post(
         `https://gitlab.com/api/v4/projects/${projectId}/repository/branches`,
         { branch: uploadBranch, ref: baseBranch },
         { headers: { 'PRIVATE-TOKEN': token } }
-        
+
       );
       console.log(`⚠️ Branch '${uploadBranch}' created from '${baseBranch}'`);
     }
@@ -896,7 +894,7 @@ const pushProductToGitlab = async (productName, token, productData, environments
     console.error('❌ Error uploading proxy:', error.response?.data || error.message);
     throw error;
   }
-}    
+}
 
 
 
@@ -924,5 +922,5 @@ module.exports = {
   fetchAllProxies,
 
   getGitlabProjectId,
-  getGitUser, 
+  getGitUser,
 };

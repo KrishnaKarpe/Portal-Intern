@@ -42,32 +42,6 @@ const CompareProxiesSuccess = () => {
         <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
           <div className="p-4 border-b border-gray-200 bg-gray-50">
             <h3 className="text-sm font-semibold text-gray-700 mb-3">Folder Structure</h3>
-            <div className="flex gap-2">
-              <Button
-                variant={activeTab === 'proxies' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setActiveTab('proxies')}
-                className="text-xs"
-              >
-                Proxies
-              </Button>
-              <Button
-                variant={activeTab === 'folders' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setActiveTab('folders')}
-                className="text-xs"
-              >
-                Folders
-              </Button>
-              <Button
-                variant={activeTab === 'files' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setActiveTab('files')}
-                className="text-xs"
-              >
-                Files
-              </Button>
-            </div>
           </div>
           <div className="flex-1 overflow-y-auto p-2">
             <FileTree

@@ -5,13 +5,19 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
+import { 
+  Key, 
+  Package, 
+  CheckCircle2,
+  AlertTriangle,
+} from 'lucide-react';
 
 const organizations = [
-  { id: 1, name: 'apigee-prod-ouax' },
-  { id: 2, name: 'apigee-non-prod-crjb' },
- 
+  { id: 1, name: 'apigee-prod-ouax', type: 'Production' },
+  { id: 2, name: 'apigee-non-prod-crjb', type: 'Non-Production' },
 ];
 
 const products = [
@@ -25,6 +31,7 @@ const products = [
 const UpdateProduct = () => {
   const [selectedOrg, setSelectedOrg] = useState("");
   const [selectedProduct, setSelectedProduct] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     displayName: '',
@@ -44,158 +51,225 @@ const UpdateProduct = () => {
     ? products.filter(product => product.orgId === parseInt(selectedOrg))
     : [];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!selectedOrg || !selectedProduct) {
       toast.error('Please select both organization and product');
       return;
     }
+
+    if (!formData.token) {
+      toast.error('Authentication token is required');
+      return;
+    }
     
-    // Simulate API call
-    toast.promise(
-      new Promise(resolve => setTimeout(resolve, 1500)),
-      {
-        loading: 'Updating product...',
-        success: 'Product successfully updated!',
-        error: 'Failed to update product',
-      }
-    );
+    if (!formData.name || !formData.displayName) {
+      toast.error('Product name and display name are required');
+      return;
+    }
     
-    console.log('Form submitted:', { ...formData, selectedOrg, selectedProduct });
+    setIsLoading(true);
+    
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      toast.success('Product successfully updated!');
+      console.log('Form submitted:', { ...formData, selectedOrg, selectedProduct });
+    } catch (error) {
+      toast.error('Failed to update product');
+      console.error('Error updating product:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="space-y-6"
-    >
-      <div className="flex items-center">
-        <h1 className="text-3xl font-bold">Update Product</h1>
-      </div>
-      
-      <Card className="overflow-hidden shadow-lg">
-        <CardHeader className="bg-white border-b">
-          <CardTitle>Update Product Details</CardTitle>
-          <CardDescription>
-            Modify existing product information
-          </CardDescription>
-        </CardHeader>
-        
-        <CardContent className="pt-6">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <label htmlFor="selectedOrg" className="text-sm font-medium">
-                  Organization
-                </label>
-                <Select value={selectedOrg} onValueChange={setSelectedOrg}>
-                  <SelectTrigger id="selectedOrg" className="w-full">
-                    <SelectValue placeholder="Select organization" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {organizations.map((org) => (
-                      <SelectItem key={org.id} value={org.id.toString()}>
-                        {org.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+    <div className="min-h-screen bg-gray-50 p-6">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="max-w-4xl mx-auto space-y-6"
+      >
+        {/* Header */}
+        <div className="text-center space-y-3">
+          <div className="flex items-center justify-center gap-3">
+            <h1 className="text-3xl font-bold text-gray-900">
+              Update Product
+            </h1>
+          </div>
+          <p className="text-gray-600 max-w-2xl mx-auto">
+            Modify existing product information in your API management platform
+          </p>
+        </div>
+
+        {/* Main Form */}
+        <Card className="shadow-lg">
+          <CardHeader className="bg-blue-50 border-b">
+            <CardTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5 text-blue-600" />
+              Product Update Configuration
+            </CardTitle>
+            <CardDescription>
+              Fill in the details below to update your product
+            </CardDescription>
+          </CardHeader>
+          
+          <CardContent className="p-6">
+            <form onSubmit={handleSubmit} className="space-y-6">
               
-              <div className="space-y-2">
-                <label htmlFor="selectedProduct" className="text-sm font-medium">
-                  Product
-                </label>
-                <Select 
-                  value={selectedProduct} 
-                  onValueChange={setSelectedProduct}
-                  disabled={!selectedOrg}
-                >
-                  <SelectTrigger id="selectedProduct" className="w-full">
-                    <SelectValue placeholder={selectedOrg ? "Select product" : "Select an organization first"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {filteredProducts.map((product) => (
-                      <SelectItem key={product.id} value={product.id.toString()}>
-                        {product.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              {/* Organization & Product Section */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Package className="h-5 w-5 text-blue-600" />
+                  <h3 className="text-lg font-semibold">Product Selection</h3>
+                </div>
+                
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">
+                      Organization *
+                    </label>
+                    <Select value={selectedOrg} onValueChange={setSelectedOrg}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select organization" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {organizations.map((org) => (
+                          <SelectItem key={org.id} value={org.id.toString()}>
+                            <div>
+                              <div className="font-medium">{org.name}</div>
+                              <div className="text-xs text-gray-500">{org.type}</div>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">
+                      Product *
+                    </label>
+                    <Select 
+                      value={selectedProduct} 
+                      onValueChange={setSelectedProduct}
+                      disabled={!selectedOrg}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={selectedOrg ? "Select product" : "Select an organization first"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {filteredProducts.map((product) => (
+                          <SelectItem key={product.id} value={product.id.toString()}>
+                            {product.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {selectedOrg && selectedProduct && (
+                  <div className="flex items-center gap-2 p-3 bg-green-50 rounded-lg border border-green-200">
+                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    <span className="text-sm text-green-800 font-medium">
+                      Product selected successfully
+                    </span>
+                  </div>
+                )}
               </div>
-            </div>
-            
-            <div className="space-y-2">
-              <label htmlFor="token" className="text-sm font-medium">
-                Authorization Token
-              </label>
-              <Input
-                id="token"
-                name="token"
-                placeholder="Enter authorization token"
-                value={formData.token}
-                onChange={handleChange}
-                className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <label htmlFor="name" className="text-sm font-medium">
-                New Product Name
-              </label>
-              <Input
-                id="name"
-                name="name"
-                placeholder="Enter new product name"
-                value={formData.name}
-                onChange={handleChange}
-                className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <label htmlFor="displayName" className="text-sm font-medium">
-                New Display Name
-              </label>
-              <Input
-                id="displayName"
-                name="displayName"
-                placeholder="Enter new display name"
-                value={formData.displayName}
-                onChange={handleChange}
-                className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <label htmlFor="description" className="text-sm font-medium">
-                New Description
-              </label>
-              <Textarea
-                id="description"
-                name="description"
-                placeholder="Enter new product description"
-                value={formData.description}
-                onChange={handleChange}
-                className="min-h-[100px] transition-all duration-200 focus:ring-2 focus:ring-primary/20"
-              />
-            </div>
-            
-            <div className="pt-2">
-              <Button 
-                type="submit" 
-                className="bg-navy hover:bg-navy-200 transition-colors duration-300"
-              >
-                Update Product
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-    </motion.div>
+
+              {/* Authentication Section */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Key className="h-5 w-5 text-blue-600" />
+                  <h3 className="text-lg font-semibold">Authentication</h3>
+                </div>
+                
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">
+                    Authorization Token *
+                  </label>
+                  <Input
+                    name="token"
+                    type="password"
+                    placeholder="Enter authorization token"
+                    value={formData.token}
+                    onChange={handleChange}
+                  />
+                  {formData.token && (
+                    <Badge variant="secondary" className="text-xs">
+                      ✓ Token provided
+                    </Badge>
+                  )}
+                </div>
+              </div>
+
+              {/* Product Details Section */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Package className="h-5 w-5 text-blue-600" />
+                  <h3 className="text-lg font-semibold">Product Details</h3>
+                </div>
+                
+                <div className="grid gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">
+                      New Product Name *
+                    </label>
+                    <Input
+                      name="name"
+                      placeholder="Enter new product name"
+                      value={formData.name}
+                      onChange={handleChange}
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">
+                      New Display Name *
+                    </label>
+                    <Input
+                      name="displayName"
+                      placeholder="Enter new display name"
+                      value={formData.displayName}
+                      onChange={handleChange}
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">
+                      New Description
+                    </label>
+                    <Textarea
+                      name="description"
+                      placeholder="Enter new product description"
+                      value={formData.description}
+                      onChange={handleChange}
+                      className="min-h-[100px]"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-4">
+                <Button
+                  type="submit"
+                  disabled={isLoading}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+                >
+                  {isLoading ? 'Updating...' : 'Update Product'}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      </motion.div>
+    </div>
   );
 };
 
