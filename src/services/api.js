@@ -316,3 +316,45 @@ export const deployProxy = async (deployData) => {
     throw error;
   }
 }  
+
+/**
+ * Fetch the file tree + diff summary for two proxy revisions
+ * @param {Object} payload - { sourceOrg, proxyName, sourceToken, revision1, revision2 }
+ * @returns {Promise<{ fileTree, fileDiffSummary }>}
+ */
+export const getCompareFileTree = async (payload) => {
+  try {
+    const response = await fetch(`${API_URL}/proxy/compare/files`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Failed to fetch compare file tree');
+    return data;
+  } catch (error) {
+    console.error('Error fetching compare file tree:', error);
+    throw error;
+  }
+};
+ 
+/**
+ * Fetch the content of a specific file from two proxy revisions
+ * @param {Object} payload - { sourceOrg, proxyName, sourceToken, revision1, revision2, filePath }
+ * @returns {Promise<{ revision1: { content, exists }, revision2: { content, exists }, isDifferent }>}
+ */
+export const getCompareFileContent = async (payload) => {
+  try {
+    const response = await fetch(`${API_URL}/proxy/compare/file-content`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Failed to fetch compare file content');
+    return data;
+  } catch (error) {
+    console.error('Error fetching compare file content:', error);
+    throw error;
+  }
+};
