@@ -79,21 +79,42 @@ const buildFileTree = (filePaths) => {
 
 /**
  * POST /api/proxy/compare/files
- * Body: { sourceOrg, proxyName, sourceToken, revision1, revision2 }
+ * Body: { 
+ *   proxy1: { org, name, token, revision },
+ *   proxy2: { org, name, token, revision }
+ * }
+ * Supports comparing proxies from different organizations
  */
 const getCompareFileTree = async (req, res) => {
-  const { sourceOrg, proxyName, sourceToken, revision1, revision2 } = req.body;
+  const { proxy1, proxy2 } = req.body;
 
-  if (!sourceOrg || !proxyName || !sourceToken || !revision1 || !revision2) {
-    return res.status(400).json({ success: false, message: 'Missing required fields' });
+  // Support both old format (backward compatibility) and new format
+  let p1, p2;
+  if (proxy1 && proxy2) {
+    // New format: two different proxies from potentially different orgs
+    p1 = proxy1;
+    p2 = proxy2;
+  } else {
+    // Old format: { sourceOrg, proxyName, sourceToken, revision1, revision2 }
+    const { sourceOrg, proxyName, sourceToken, revision1, revision2 } = req.body;
+    if (!sourceOrg || !proxyName || !sourceToken || !revision1 || !revision2) {
+      return res.status(400).json({ success: false, message: 'Missing required fields' });
+    }
+    p1 = { org: sourceOrg, name: proxyName, token: sourceToken, revision: revision1 };
+    p2 = { org: sourceOrg, name: proxyName, token: sourceToken, revision: revision2 };
+  }
+
+  if (!p1?.org || !p1?.name || !p1?.token || !p1?.revision || 
+      !p2?.org || !p2?.name || !p2?.token || !p2?.revision) {
+    return res.status(400).json({ success: false, message: 'Missing required fields for both proxies' });
   }
 
   try {
-    console.log(`Comparing ${proxyName}: rev ${revision1} vs rev ${revision2}`);
+    console.log(`Comparing ${p1.name} (${p1.org} rev ${p1.revision}) vs ${p2.name} (${p2.org} rev ${p2.revision})`);
 
     const [files1, files2] = await Promise.all([
-      extractFilesFromBundle(sourceOrg, proxyName, sourceToken, revision1),
-      extractFilesFromBundle(sourceOrg, proxyName, sourceToken, revision2),
+      extractFilesFromBundle(p1.org, p1.name, p1.token, p1.revision),
+      extractFilesFromBundle(p2.org, p2.name, p2.token, p2.revision),
     ]);
 
     const allPaths = [...new Set([...Object.keys(files1), ...Object.keys(files2)])].sort();
@@ -117,7 +138,13 @@ const getCompareFileTree = async (req, res) => {
       return { filePath, status, isBinary: binary };
     });
 
-    return res.status(200).json({ success: true, fileTree, fileDiffSummary, revision1, revision2 });
+    return res.status(200).json({ 
+      success: true, 
+      fileTree, 
+      fileDiffSummary, 
+      proxy1: { name: p1.name, org: p1.org, revision: p1.revision },
+      proxy2: { name: p2.name, org: p2.org, revision: p2.revision }
+    });
   } catch (error) {
     console.error('Error in getCompareFileTree:', error);
     return res.status(error.status || 500).json({
@@ -129,21 +156,41 @@ const getCompareFileTree = async (req, res) => {
 
 /**
  * POST /api/proxy/compare/file-content
- * Body: { sourceOrg, proxyName, sourceToken, revision1, revision2, filePath }
+ * Body: { 
+ *   proxy1: { org, name, token, revision },
+ *   proxy2: { org, name, token, revision },
+ *   filePath 
+ * }
+ * Supports comparing file content from proxies in different organizations
  */
 const getCompareFileContent = async (req, res) => {
-  const { sourceOrg, proxyName, sourceToken, revision1, revision2, filePath } = req.body;
+  const { proxy1, proxy2, filePath } = req.body;
 
-  if (!sourceOrg || !proxyName || !sourceToken || !revision1 || !revision2 || !filePath) {
+  // Support both old format (backward compatibility) and new format
+  let p1, p2;
+  if (proxy1 && proxy2) {
+    p1 = proxy1;
+    p2 = proxy2;
+  } else {
+    const { sourceOrg, proxyName, sourceToken, revision1, revision2 } = req.body;
+    if (!sourceOrg || !proxyName || !sourceToken || !revision1 || !revision2 || !filePath) {
+      return res.status(400).json({ success: false, message: 'Missing required fields' });
+    }
+    p1 = { org: sourceOrg, name: proxyName, token: sourceToken, revision: revision1 };
+    p2 = { org: sourceOrg, name: proxyName, token: sourceToken, revision: revision2 };
+  }
+
+  if (!p1?.org || !p1?.name || !p1?.token || !p1?.revision || 
+      !p2?.org || !p2?.name || !p2?.token || !p2?.revision || !filePath) {
     return res.status(400).json({ success: false, message: 'Missing required fields' });
   }
 
   try {
-    console.log(`File content: ${filePath} | rev ${revision1} vs ${revision2}`);
+    console.log(`File content: ${filePath} | ${p1.name} (${p1.org} rev ${p1.revision}) vs ${p2.name} (${p2.org} rev ${p2.revision})`);
 
     const [files1, files2] = await Promise.all([
-      extractFilesFromBundle(sourceOrg, proxyName, sourceToken, revision1),
-      extractFilesFromBundle(sourceOrg, proxyName, sourceToken, revision2),
+      extractFilesFromBundle(p1.org, p1.name, p1.token, p1.revision),
+      extractFilesFromBundle(p2.org, p2.name, p2.token, p2.revision),
     ]);
 
     const f1 = files1[filePath] || null;
@@ -178,8 +225,8 @@ const getCompareFileContent = async (req, res) => {
       filePath,
       isBinary: binary,
       isDifferent,
-      revision1: { revision: revision1, content: f1?.content ?? null, exists: !!f1, size: f1?.size ?? null },
-      revision2: { revision: revision2, content: f2?.content ?? null, exists: !!f2, size: f2?.size ?? null },
+        revision1: { revision: p1.revision, content: f1?.content ?? null, exists: !!f1, size: f1?.size ?? null },
+        revision2: { revision: p2.revision, content: f2?.content ?? null, exists: !!f2, size: f2?.size ?? null },
       diffChunks,
     });
   } catch (error) {
