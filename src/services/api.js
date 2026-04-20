@@ -358,3 +358,15 @@ export const getCompareFileContent = async (payload) => {
     throw error;
   }
 };
+
+
+export async function getProxyRevisions({ org, name, token }) {
+  const res = await fetch(`${API_URL}/proxy/compare/revisions`, {  
+    method: 'POST',                                                  
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ org, name, token }),
+  });
+  if (!res.ok) throw new Error('Failed to fetch revisions');
+  const data = await res.json();
+  return data.revisions; // string[]
+}

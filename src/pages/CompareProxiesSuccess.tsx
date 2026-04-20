@@ -30,9 +30,16 @@ function useSyncedScroll(refs: React.RefObject<HTMLDivElement>[]) {
 }
 
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, GitCompare, Folder, FileText, RefreshCw, AlertCircle, Binary, ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  ArrowLeft, GitCompare, Folder, FileText, RefreshCw,
+  AlertCircle, Binary, ChevronLeft, ChevronRight, ChevronDown,
+} from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { getCompareFileTree, getCompareFileContent } from '@/services/api';
+import {
+  getCompareFileTree,
+  getCompareFileContent,
+  getProxyRevisions,   // NEW — fetches revision list for a proxy; add this to your API service
+} from '@/services/api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -53,6 +60,13 @@ interface FileSummary {
   filePath: string;
   status: 'modified' | 'added' | 'removed' | 'unchanged';
   isBinary: boolean;
+}
+
+interface ProxyInfo {
+  org: string;
+  name: string;
+  token: string;
+  revision: string;
 }
 
 // ─── Line-by-line diff renderer ───────────────────────────────────────────────
@@ -116,37 +130,91 @@ const statusBadge = (status: string) => {
   }
 };
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+// ─── Revision Dropdown ────────────────────────────────────────────────────────
 
-interface ProxyInfo {
-  org: string;
-  name: string;
-  token: string;
-  revision: string;
+interface RevisionDropdownProps {
+  revisions: string[];
+  selected: string;
+  onChange: (rev: string) => void;
+  isLoading: boolean;
+  accentCls: string;        // e.g. 'border-blue-300 text-blue-800 bg-blue-50'
+  accentFocusCls: string;   // e.g. 'focus:ring-blue-300'
 }
+
+const RevisionDropdown = ({
+  revisions,
+  selected,
+  onChange,
+  isLoading,
+  accentCls,
+  accentFocusCls,
+}: RevisionDropdownProps) => {
+  const options = revisions.length > 0 ? revisions : [selected]; 
+
+  return (
+    <div className="relative flex items-center">
+      <select
+        value={selected}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={isLoading}  
+        className={`
+          appearance-none pl-2.5 pr-7 py-0.5 rounded-md border text-[11px] font-semibold
+          cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed
+          focus:outline-none focus:ring-2 focus:ring-offset-1
+          transition-colors
+          ${accentCls} ${accentFocusCls}
+        `}
+      >
+        {isLoading ? (
+          <option>Loading…</option>
+        ) : (
+          options.map((rev) => (
+            <option key={rev} value={rev}>
+              rev {rev}
+            </option>
+          ))
+        )}
+      </select>
+      <ChevronDown className="pointer-events-none absolute right-1.5 h-3 w-3 opacity-60" />
+    </div>
+  );
+};
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 const CompareProxiesSuccess = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
   const state = location.state || {};
-  let proxy1: ProxyInfo | undefined;
-  let proxy2: ProxyInfo | undefined;
+  let initialProxy1: ProxyInfo | undefined;
+  let initialProxy2: ProxyInfo | undefined;
 
   if (state.proxy1 && state.proxy2) {
-    proxy1 = state.proxy1;
-    proxy2 = state.proxy2;
+    initialProxy1 = state.proxy1;
+    initialProxy2 = state.proxy2;
   } else {
     const { proxyName, sourceOrg, revision1, revision2, authToken } = state;
     if (sourceOrg && proxyName && authToken && revision1 && revision2) {
-      proxy1 = { org: sourceOrg, name: proxyName, token: authToken, revision: revision1 };
-      proxy2 = { org: sourceOrg, name: proxyName, token: authToken, revision: revision2 };
+      initialProxy1 = { org: sourceOrg, name: proxyName, token: authToken, revision: revision1 };
+      initialProxy2 = { org: sourceOrg, name: proxyName, token: authToken, revision: revision2 };
     }
   }
 
-  const [selectedFile, setSelectedFile]   = useState<string>('');
-  const [fileSummary, setFileSummary]     = useState<FileSummary[]>([]);
-  const [fileContent, setFileContent]     = useState<FileContent | null>(null);
+  // ── Active revision state (user-controlled) ──
+  const [rev1, setRev1] = useState<string>(initialProxy1?.revision ?? '');
+  const [rev2, setRev2] = useState<string>(initialProxy2?.revision ?? '');
+
+  // ── Available revisions ──
+  const [revList1, setRevList1] = useState<string[]>([]);
+  const [revList2, setRevList2] = useState<string[]>([]);
+  const [isLoadingRevs1, setIsLoadingRevs1] = useState(false);
+  const [isLoadingRevs2, setIsLoadingRevs2] = useState(false);
+
+  // ── File tree / content ──
+  const [selectedFile, setSelectedFile]     = useState<string>('');
+  const [fileSummary, setFileSummary]       = useState<FileSummary[]>([]);
+  const [fileContent, setFileContent]       = useState<FileContent | null>(null);
   const [comparisonInfo, setComparisonInfo] = useState<{
     proxy1: { name: string; org: string; revision: string };
     proxy2: { name: string; org: string; revision: string };
@@ -162,16 +230,58 @@ const CompareProxiesSuccess = () => {
   const rightPanelRef = useRef<HTMLDivElement>(null);
   useSyncedScroll([leftPanelRef, rightPanelRef]);
 
-  // ── Fetch file tree on mount ──
+  // ── Helper: build proxy objects from current state ──
+  const getProxy1 = useCallback((): ProxyInfo | undefined =>
+    initialProxy1 ? { ...initialProxy1, revision: rev1 } : undefined,
+    [initialProxy1, rev1]);
+
+  const getProxy2 = useCallback((): ProxyInfo | undefined =>
+    initialProxy2 ? { ...initialProxy2, revision: rev2 } : undefined,
+    [initialProxy2, rev2]);
+
+  // ── Fetch revision lists on mount ──
   useEffect(() => {
-    if (!proxy1 || !proxy2) {
+    if (!initialProxy1 || !initialProxy2) return;
+
+    const fetchRevisions = async (
+      proxy: ProxyInfo,
+      setList: (r: string[]) => void,
+      setLoading: (v: boolean) => void,
+    ) => {
+      setLoading(true);
+      try {
+        const revisions: string[] = await getProxyRevisions({
+          org: proxy.org,
+          name: proxy.name,
+          token: proxy.token,
+        });
+        setList(revisions);
+      } catch (err) {
+        console.error('Revision fetch failed:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRevisions(initialProxy1, setRevList1, setIsLoadingRevs1);
+    fetchRevisions(initialProxy2, setRevList2, setIsLoadingRevs2);
+  }, []);
+
+  // ── Fetch file tree whenever rev1 or rev2 changes ──
+  useEffect(() => {
+    const proxy1 = getProxy1();
+    const proxy2 = getProxy2();
+    if (!proxy1 || !proxy2 || !proxy1.revision || !proxy2.revision) {
       setTreeError('Missing required comparison parameters.');
       setIsLoadingTree(false);
       return;
     }
+
     (async () => {
       setIsLoadingTree(true);
       setTreeError(null);
+      setSelectedFile('');
+      setFileContent(null);
       try {
         const result = await getCompareFileTree({
           proxy1: { org: proxy1.org, name: proxy1.name, token: proxy1.token, revision: proxy1.revision },
@@ -185,10 +295,12 @@ const CompareProxiesSuccess = () => {
         setIsLoadingTree(false);
       }
     })();
-  }, []);
+  }, [rev1, rev2]);
 
   // ── Fetch file content on selection ──
   const handleFileSelect = useCallback(async (filePath: string) => {
+    const proxy1 = getProxy1();
+    const proxy2 = getProxy2();
     if (!proxy1 || !proxy2) return;
     setSelectedFile(filePath);
     setFileContent(null);
@@ -206,7 +318,7 @@ const CompareProxiesSuccess = () => {
     } finally {
       setIsLoadingContent(false);
     }
-  }, [proxy1, proxy2]);
+  }, [getProxy1, getProxy2]);
 
   // ── Stats ──
   const counts = {
@@ -217,9 +329,14 @@ const CompareProxiesSuccess = () => {
   };
 
   const proxyLabel = (side: 'left' | 'right') => {
-    if (side === 'left') return comparisonInfo?.proxy1.name ?? proxy1?.name ?? 'Proxy 1';
-    return comparisonInfo?.proxy2.name ?? proxy2?.name ?? 'Proxy 2';
+    if (side === 'left')  return comparisonInfo?.proxy1.name ?? initialProxy1?.name ?? 'Proxy 1';
+    return comparisonInfo?.proxy2.name ?? initialProxy2?.name ?? 'Proxy 2';
   };
+
+  const comparisonSubtitle =
+    initialProxy1 && initialProxy2
+      ? `${initialProxy1.name} (${initialProxy1.org}) vs ${initialProxy2.name} (${initialProxy2.org})`
+      : 'Loading...';
 
   // ── Render panel content ──
   const renderPanel = (side: 'left' | 'right') => {
@@ -231,7 +348,6 @@ const CompareProxiesSuccess = () => {
         </div>
       );
     }
-
     if (isLoadingContent) {
       return (
         <div className="flex items-center justify-center h-full text-gray-400">
@@ -240,7 +356,6 @@ const CompareProxiesSuccess = () => {
         </div>
       );
     }
-
     if (contentError) {
       return (
         <div className="m-4 p-3 text-sm text-red-700 bg-red-50 rounded-lg flex gap-2 items-start">
@@ -249,7 +364,6 @@ const CompareProxiesSuccess = () => {
         </div>
       );
     }
-
     if (!fileContent) return null;
 
     if (fileContent.isBinary) {
@@ -291,12 +405,6 @@ const CompareProxiesSuccess = () => {
     return null;
   };
 
-  const comparisonSubtitle = comparisonInfo
-    ? `${comparisonInfo.proxy1.name} (${comparisonInfo.proxy1.org}) vs ${comparisonInfo.proxy2.name} (${comparisonInfo.proxy2.org})`
-    : proxy1 && proxy2
-    ? `${proxy1.name} (${proxy1.org}) vs ${proxy2.name} (${proxy2.org})`
-    : 'Loading...';
-
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="flex h-screen">
@@ -307,7 +415,6 @@ const CompareProxiesSuccess = () => {
             sidebarCollapsed ? 'w-10' : 'w-72'
           }`}
         >
-          {/* Collapsed strip — just an expand button, always visible */}
           {sidebarCollapsed && (
             <div className="flex flex-col items-center pt-3 gap-3">
               <button
@@ -320,7 +427,6 @@ const CompareProxiesSuccess = () => {
             </div>
           )}
 
-          {/* Sidebar header */}
           {!sidebarCollapsed && (
             <div className="px-3 pt-3 pb-2.5 border-b border-gray-200 bg-gray-50 flex flex-col gap-2">
               <div className="flex items-center justify-between">
@@ -349,7 +455,6 @@ const CompareProxiesSuccess = () => {
             </div>
           )}
 
-          {/* File list */}
           {!sidebarCollapsed && (
             <div className="flex-1 overflow-y-auto py-1.5 px-2">
               {isLoadingTree ? (
@@ -367,7 +472,6 @@ const CompareProxiesSuccess = () => {
                   const fileName = item.filePath.split('/').pop();
                   const isSelected = selectedFile === item.filePath;
                   const badge = statusBadge(item.status);
-
                   return (
                     <div
                       key={item.filePath}
@@ -444,7 +548,7 @@ const CompareProxiesSuccess = () => {
                   ? 'bg-amber-50 text-amber-700 border-amber-200'
                   : 'bg-gray-50 text-gray-500 border-gray-200'
               }`}>
-                {fileContent.isDifferent ? '⚡ Files differ between revisions' : '✓ Files are identical'}
+                {fileContent.isDifferent ? 'Files differ between revisions' : '✓ Files are identical'}
               </div>
             )}
           </div>
@@ -455,14 +559,22 @@ const CompareProxiesSuccess = () => {
             {/* Proxy 1 — LEFT */}
             <div className="flex-1 border-r border-gray-200 flex flex-col overflow-hidden">
               <div className="px-3 py-2 bg-blue-50 border-b border-blue-100 flex-shrink-0 flex items-center gap-2">
-                <span className="text-[11px] font-semibold text-blue-800">
-                  {comparisonInfo ? comparisonInfo.proxy1.name : (proxy1?.name || 'Proxy 1')}
-                  <span className="font-normal text-blue-500 ml-1">
-                    · rev {comparisonInfo ? comparisonInfo.proxy1.revision : (proxy1?.revision || '')}
-                  </span>
+                <span className="text-[11px] font-semibold text-blue-800 shrink-0">
+                  {comparisonInfo?.proxy1.name ?? initialProxy1?.name ?? 'Proxy 1'}
                 </span>
+
+                {/* ── Revision dropdown — LEFT ── */}
+                <RevisionDropdown
+                  revisions={revList1}
+                  selected={rev1}
+                  onChange={(newRev) => setRev1(newRev)}
+                  isLoading={isLoadingRevs1}
+                  accentCls="border-blue-300 text-blue-800 bg-blue-50 hover:bg-blue-100"
+                  accentFocusCls="focus:ring-blue-300"
+                />
+
                 {selectedFile && (
-                  <span className="text-[10px] text-blue-400 truncate">{selectedFile.split('/').pop()}</span>
+                  <span className="text-[10px] text-blue-400 truncate ml-auto">{selectedFile.split('/').pop()}</span>
                 )}
               </div>
               <div className="flex-1 overflow-auto" ref={leftPanelRef}>
@@ -473,14 +585,22 @@ const CompareProxiesSuccess = () => {
             {/* Proxy 2 — RIGHT */}
             <div className="flex-1 flex flex-col overflow-hidden">
               <div className="px-3 py-2 bg-green-50 border-b border-green-100 flex-shrink-0 flex items-center gap-2">
-                <span className="text-[11px] font-semibold text-green-800">
-                  {comparisonInfo ? comparisonInfo.proxy2.name : (proxy2?.name || 'Proxy 2')}
-                  <span className="font-normal text-green-500 ml-1">
-                    · rev {comparisonInfo ? comparisonInfo.proxy2.revision : (proxy2?.revision || '')}
-                  </span>
+                <span className="text-[11px] font-semibold text-green-800 shrink-0">
+                  {comparisonInfo?.proxy2.name ?? initialProxy2?.name ?? 'Proxy 2'}
                 </span>
+
+                {/* ── Revision dropdown — RIGHT ── */}
+                <RevisionDropdown
+                  revisions={revList2}
+                  selected={rev2}
+                  onChange={(newRev) => setRev2(newRev)}
+                  isLoading={isLoadingRevs2}
+                  accentCls="border-green-300 text-green-800 bg-green-50 hover:bg-green-100"
+                  accentFocusCls="focus:ring-green-300"
+                />
+
                 {selectedFile && (
-                  <span className="text-[10px] text-green-400 truncate">{selectedFile.split('/').pop()}</span>
+                  <span className="text-[10px] text-green-400 truncate ml-auto">{selectedFile.split('/').pop()}</span>
                 )}
               </div>
               <div className="flex-1 overflow-auto" ref={rightPanelRef}>

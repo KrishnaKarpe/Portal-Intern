@@ -1,6 +1,8 @@
 const AdmZip = require('adm-zip');
 const { diffLines } = require('diff');
-const { fetchProxyFromOrg } = require('../services/apiService');
+const axios = require('axios');
+const { fetchProxyFromOrg, fetchLatestRevision } = require('../services/apiService'); 
+
 
 // Binary file extensions that cannot be displayed as text
 const BINARY_EXTENSIONS = new Set([
@@ -9,6 +11,30 @@ const BINARY_EXTENSIONS = new Set([
   '.pdf', '.doc', '.docx', '.xls', '.xlsx',
   '.so', '.dll', '.exe', '.bin',
 ]);
+
+
+
+
+const getProxyRevisions = async (req, res) => {
+  const { org, name, token } = req.body;
+  if (!org || !name || !token) {
+    return res.status(400).json({ success: false, message: 'Missing org, name, or token' });
+  }
+  try {
+    const response = await axios({
+      method: 'GET',
+      url: `https://apigee.googleapis.com/v1/organizations/${org}/apis/${name}/revisions`, 
+      headers: { Authorization: `Bearer ${token}` },
+      timeout: 30000,
+    });
+
+    return res.status(200).json({ success: true, revisions: response.data }); // response.data is string[]
+  } catch (error) {
+    console.error('Error fetching revisions:', error.message);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 
 /**
  * Check if a file is binary based on its extension
@@ -238,4 +264,4 @@ const getCompareFileContent = async (req, res) => {
   }
 };
 
-module.exports = { getCompareFileTree, getCompareFileContent };
+module.exports = { getCompareFileTree, getCompareFileContent, getProxyRevisions };
