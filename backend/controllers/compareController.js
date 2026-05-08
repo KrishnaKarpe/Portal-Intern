@@ -3,7 +3,6 @@ const { diffLines } = require('diff');
 const axios = require('axios');
 const { fetchProxyFromOrg, fetchLatestRevision } = require('../services/apiService'); 
 
-
 // Binary file extensions that cannot be displayed as text
 const BINARY_EXTENSIONS = new Set([
   '.jar', '.class', '.zip', '.war', '.ear',
@@ -11,6 +10,26 @@ const BINARY_EXTENSIONS = new Set([
   '.pdf', '.doc', '.docx', '.xls', '.xlsx',
   '.so', '.dll', '.exe', '.bin',
 ]);
+
+const proxyFileCache = new Map();
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+const getCacheKey = (org, proxyName, revision) => `${org}::${proxyName}::${revision}`;
+
+const getCachedFilesForRevision = async (sourceOrg, proxyName, token, revision) => {
+  const cacheKey = getCacheKey(sourceOrg, proxyName, revision);
+  const now = Date.now();
+  const cached = proxyFileCache.get(cacheKey);
+
+  if (cached && now - cached.cachedAt < CACHE_TTL_MS) {
+    console.log(`Using cached files for ${proxyName} rev ${revision} in org ${sourceOrg}`);
+    return cached.files;
+  }
+
+  const files = await extractFilesFromBundle(sourceOrg, proxyName, token, revision);
+  proxyFileCache.set(cacheKey, { files, cachedAt: now });
+  return files;
+};
 
 
 
@@ -139,8 +158,8 @@ const getCompareFileTree = async (req, res) => {
     console.log(`Comparing ${p1.name} (${p1.org} rev ${p1.revision}) vs ${p2.name} (${p2.org} rev ${p2.revision})`);
 
     const [files1, files2] = await Promise.all([
-      extractFilesFromBundle(p1.org, p1.name, p1.token, p1.revision),
-      extractFilesFromBundle(p2.org, p2.name, p2.token, p2.revision),
+      getCachedFilesForRevision(p1.org, p1.name, p1.token, p1.revision),
+      getCachedFilesForRevision(p2.org, p2.name, p2.token, p2.revision),
     ]);
 
     const allPaths = [...new Set([...Object.keys(files1), ...Object.keys(files2)])].sort();
@@ -215,8 +234,8 @@ const getCompareFileContent = async (req, res) => {
     console.log(`File content: ${filePath} | ${p1.name} (${p1.org} rev ${p1.revision}) vs ${p2.name} (${p2.org} rev ${p2.revision})`);
 
     const [files1, files2] = await Promise.all([
-      extractFilesFromBundle(p1.org, p1.name, p1.token, p1.revision),
-      extractFilesFromBundle(p2.org, p2.name, p2.token, p2.revision),
+      getCachedFilesForRevision(p1.org, p1.name, p1.token, p1.revision),
+      getCachedFilesForRevision(p2.org, p2.name, p2.token, p2.revision),
     ]);
 
     const f1 = files1[filePath] || null;
