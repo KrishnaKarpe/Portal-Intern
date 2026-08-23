@@ -7,6 +7,7 @@ const {
   fetchProductFromOrg,
   fetchAllProductsFromOrg,
   modifyProductForClone,
+  updateProductInOrg,
   createProductInOrg
 } = require('../services/apiService');
 

@@ -1,13 +1,65 @@
 /**
  * API Service - Handles external API communication
-  * Responsible for making requests to the Apigee API
-    */
+ * Responsible for making requests to the Apigee API
+ */
 
-const axios = require('axios');
-const fs = require('fs');
-const path = require('path');
-const AdmZip = require('adm-zip');
-const JSZip = require('jszip');
+const axios = require("axios");
+const fs = require("fs");
+const path = require("path");
+const AdmZip = require("adm-zip");
+const JSZip = require("jszip");
+
+const logApigeeCall = (phase, meta = {}) => {
+  const details = {
+    phase,
+    method: meta.method || "GET",
+    url: meta.url,
+    orgId: meta.orgId,
+    proxyName: meta.proxyName,
+    productName: meta.productName,
+    revision: meta.revision,
+    environment: meta.environment,
+    status: meta.status,
+    durationMs: meta.durationMs,
+    error: meta.error?.message,
+  };
+
+  if (phase === "error") {
+    console.error("[Apigee API]", details);
+  } else {
+    console.log("[Apigee API]", details);
+  }
+};
+
+const callApigee = async (config, meta = {}) => {
+  const startedAt = Date.now();
+  const method = config.method || "GET";
+  const url = config.url;
+
+  logApigeeCall("request", { ...meta, method, url });
+
+  try {
+    const response = await axios(config);
+    logApigeeCall("response", {
+      ...meta,
+      method,
+      url,
+      status: response?.status,
+      durationMs: Date.now() - startedAt,
+    });
+    return response;
+  } catch (error) {
+    logApigeeCall("error", {
+      ...meta,
+      method,
+      url,
+      status: error.response?.status,
+      durationMs: Date.now() - startedAt,
+      error,
+    });
+    throw error;
+  }
+};
 
 /**
  * Fetch a single product from an organization using Apigee API
@@ -19,20 +71,23 @@ const JSZip = require('jszip');
 const fetchProductFromOrg = async (orgId, productName, token) => {
   console.log(`Fetching product ${productName} from organization ${orgId}`);
 
-  if (!token || token.trim() === '') {
-    throw new Error('Authentication token is required');
+  if (!token || token.trim() === "") {
+    throw new Error("Authentication token is required");
   }
 
   try {
-    const response = await axios({
-      method: 'GET',
-      url: `https://apigee.googleapis.com/v1/organizations/${orgId}/apiproducts/${productName}`,
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
+    const response = await callApigee(
+      {
+        method: "GET",
+        url: `https://apigee.googleapis.com/v1/organizations/${orgId}/apiproducts/${productName}`,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        timeout: 10000, // Add timeout to prevent hanging requests
       },
-      timeout: 10000 // Add timeout to prevent hanging requests
-    });
+      { orgId, productName },
+    );
 
     console.log(`Successfully fetched product data for ${productName}`);
 
@@ -43,7 +98,7 @@ const fetchProductFromOrg = async (orgId, productName, token) => {
       descriptionLength: productData.description?.length || 0,
       hasEnvironments: !!productData.environments,
       environmentsCount: productData.environments?.length || 0,
-      environments: productData.environments
+      environments: productData.environments,
     });
 
     return productData;
@@ -51,8 +106,8 @@ const fetchProductFromOrg = async (orgId, productName, token) => {
     console.error(`Error fetching product ${productName}:`, error.message);
 
     if (error.response) {
-      console.error('Response status:', error.response.status);
-      console.error('Response data:', error.response.data);
+      console.error("Response status:", error.response.status);
+      console.error("Response data:", error.response.data);
     }
 
     const statusCode = error.response?.status || 500;
@@ -74,28 +129,33 @@ const fetchProductFromOrg = async (orgId, productName, token) => {
  */
 const fetchAllProductsFromOrg = async (orgId, token) => {
   console.log(`Fetching all products from organization ${orgId}`);
-  console.log(`Using token: ${token ? token.substring(0, 20) + '...' : 'NO TOKEN'}`);
+  console.log(
+    `Using token: ${token ? token.substring(0, 20) + "..." : "NO TOKEN"}`,
+  );
 
-  if (!token || token.trim() === '') {
-    throw new Error('Authentication token is required');
+  if (!token || token.trim() === "") {
+    throw new Error("Authentication token is required");
   }
 
   try {
-    const response = await axios({
-      method: 'GET',
-      url: `https://apigee.googleapis.com/v1/organizations/${orgId}/apiproducts`,
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
+    const response = await callApigee(
+      {
+        method: "GET",
+        url: `https://apigee.googleapis.com/v1/organizations/${orgId}/apiproducts`,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      },
+      { orgId },
+    );
 
-    console.log('Successfully fetched products list:', response.data);
+    console.log("Successfully fetched products list:", response.data);
     return response.data;
   } catch (error) {
-    console.error('Error fetching products:', error.message);
-    console.error('Status code:', error.response?.status);
-    console.error('Response data:', error.response?.data);
+    console.error("Error fetching products:", error.message);
+    console.error("Status code:", error.response?.status);
+    console.error("Response data:", error.response?.data);
 
     const statusCode = error.response?.status || 500;
     const errorMessage = error.response?.data?.error?.message || error.message;
@@ -115,8 +175,8 @@ const fetchAllProductsFromOrg = async (orgId, token) => {
  * @returns {Object} - Modified product data
  */
 const modifyProductForClone = (productData, newData) => {
-  console.log('Original product data:', productData);
-  console.log('New data to be applied:', newData);
+  console.log("Original product data:", productData);
+  console.log("New data to be applied:", newData);
 
   const modifiedData = {
     ...productData,
@@ -125,7 +185,7 @@ const modifyProductForClone = (productData, newData) => {
     description: newData.description,
     environments: Array.isArray(newData.environments)
       ? newData.environments
-      : [newData.environments]
+      : [newData.environments],
   };
 
   // Remove metadata fields that shouldn't be copied
@@ -134,7 +194,7 @@ const modifyProductForClone = (productData, newData) => {
   delete modifiedData.lastModifiedAt;
   delete modifiedData.lastModifiedBy;
 
-  console.log('Modified product data:', modifiedData);
+  console.log("Modified product data:", modifiedData);
   return modifiedData;
 };
 
@@ -146,31 +206,41 @@ const modifyProductForClone = (productData, newData) => {
  * @param {string} newProductName - New product name (optional, for logging)
  * @returns {Promise<Object>} - Created product data
  */
-const createProductInOrg = async (orgId, productData, token, newProductName = null) => {
-  console.log(`Creating product ${newProductName || productData.name || 'unnamed'} in organization ${orgId}`);
-  console.log('Product data to be created:', productData);
+const createProductInOrg = async (
+  orgId,
+  productData,
+  token,
+  newProductName = null,
+) => {
+  console.log(
+    `Creating product ${newProductName || productData.name || "unnamed"} in organization ${orgId}`,
+  );
+  console.log("Product data to be created:", productData);
 
-  if (!token || token.trim() === '') {
-    throw new Error('Authentication token is required');
+  if (!token || token.trim() === "") {
+    throw new Error("Authentication token is required");
   }
 
   try {
-    const response = await axios({
-      method: 'POST',
-      url: `https://apigee.googleapis.com/v1/organizations/${orgId}/apiproducts`,
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
+    const response = await callApigee(
+      {
+        method: "POST",
+        url: `https://apigee.googleapis.com/v1/organizations/${orgId}/apiproducts`,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        data: productData,
       },
-      data: productData
-    });
+      { orgId, productName: newProductName || productData.name },
+    );
 
-    console.log('Successfully created product:', response.data);
+    console.log("Successfully created product:", response.data);
     return response.data;
   } catch (error) {
-    console.error('Error creating product:', error.message);
-    console.error('Status code:', error.response?.status);
-    console.error('Response data:', error.response?.data);
+    console.error("Error creating product:", error.message);
+    console.error("Status code:", error.response?.status);
+    console.error("Response data:", error.response?.data);
 
     const statusCode = error.response?.status || 500;
     const errorMessage = error.response?.data?.error?.message || error.message;
@@ -194,35 +264,37 @@ const createProductInOrg = async (orgId, productData, token, newProductName = nu
  * @returns {Promise<Object>} - Proxy bundle data
  */
 const fetchProxyFromOrg = async (orgId, proxyName, token, revision) => {
-  console.log(`Fetching proxy ${proxyName} revision ${revision} from organization ${orgId}`);
+  console.log(
+    `Fetching proxy ${proxyName} revision ${revision} from organization ${orgId}`,
+  );
 
-  if (!token || token.trim() === '') {
-    throw new Error('Authentication token is required');
+  if (!token || token.trim() === "") {
+    throw new Error("Authentication token is required");
   }
 
   try {
-    const response = await axios({
-      method: 'GET',
-      url: `https://apigee.googleapis.com/v1/organizations/${orgId}/apis/${proxyName}/revisions/${revision}?format=bundle`,
-      headers: {
-        'Authorization': `Bearer ${token}`,
-
+    const response = await callApigee(
+      {
+        method: "GET",
+        url: `https://apigee.googleapis.com/v1/organizations/${orgId}/apis/${proxyName}/revisions/${revision}?format=bundle`,
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        responseType: "arraybuffer", // Use arraybuffer to handle binary data
+        timeout: 30000, // Longer timeout for proxy bundles
       },
-      responseType: 'arraybuffer', // Use arraybuffer to handle binary data
-      timeout: 30000 // Longer timeout for proxy bundles
-    });
-
+      { orgId, proxyName, revision },
+    );
 
     console.log(`Successfully fetched proxy bundle for ${proxyName}`);
 
     return response.data;
-
   } catch (error) {
     console.error(`Error fetching proxy ${proxyName}:`, error.message);
 
     if (error.response) {
-      console.error('Response status:', error.response.status);
-      console.error('Response data:', error.response.data);
+      console.error("Response status:", error.response.status);
+      console.error("Response data:", error.response.data);
     }
 
     const statusCode = error.response?.status || 500;
@@ -246,19 +318,22 @@ const fetchProxyFromOrg = async (orgId, proxyName, token, revision) => {
 const fetchLatestRevision = async (orgId, proxyName, token) => {
   console.log(`Fetching revisions of ${proxyName} from organization ${orgId}`);
 
-  if (!token || token.trim() === '') {
-    throw new Error('Authentication token is required');
+  if (!token || token.trim() === "") {
+    throw new Error("Authentication token is required");
   }
 
   try {
-    const response = await axios({
-      method: 'GET',
-      url: `https://apigee.googleapis.com/v1/organizations/${orgId}/apis/${proxyName}/revisions`,
-      headers: {
-        'Authorization': `Bearer ${token}`,
+    const response = await callApigee(
+      {
+        method: "GET",
+        url: `https://apigee.googleapis.com/v1/organizations/${orgId}/apis/${proxyName}/revisions`,
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        timeout: 30000,
       },
-      timeout: 30000,
-    });
+      { orgId, proxyName },
+    );
 
     const revisions = response.data; //["1", "2", "3", ...]
     console.log(`✅ Revisions fetched: ${revisions}`);
@@ -269,13 +344,15 @@ const fetchLatestRevision = async (orgId, proxyName, token) => {
     console.log(`📦 Latest revision for ${proxyName}: ${latestRevision}`);
 
     return latestRevision;
-
   } catch (error) {
-    console.error(`❌ Error fetching revisions for ${proxyName}:`, error.message);
+    console.error(
+      `❌ Error fetching revisions for ${proxyName}:`,
+      error.message,
+    );
 
     if (error.response) {
-      console.error('Response status:', error.response.status);
-      console.error('Response data:', error.response.data);
+      console.error("Response status:", error.response.status);
+      console.error("Response data:", error.response.data);
     }
 
     const statusCode = error.response?.status || 500;
@@ -289,7 +366,6 @@ const fetchLatestRevision = async (orgId, proxyName, token) => {
   }
 };
 
-
 /**
  * Send/Import a proxy to target organization using Apigee API
  * @param {string} orgId - Target organization ID
@@ -299,11 +375,17 @@ const fetchLatestRevision = async (orgId, proxyName, token) => {
  * @param {string} basepath - Base path for the proxy
  * @returns {Promise<Object>} - Created proxy data
  */
-const SendProxyToOrg = async (orgId, proxyName, token, proxyBundle, basepath) => {
+const SendProxyToOrg = async (
+  orgId,
+  proxyName,
+  token,
+  proxyBundle,
+  basepath,
+) => {
   console.log(`Importing proxy ${proxyName} to organization ${orgId}`);
 
-  if (!token || token.trim() === '') {
-    throw new Error('Authentication token is required');
+  if (!token || token.trim() === "") {
+    throw new Error("Authentication token is required");
   }
 
   try {
@@ -321,7 +403,7 @@ const SendProxyToOrg = async (orgId, proxyName, token, proxyBundle, basepath) =>
       // 3. Replace BasePath
       defaultXml = defaultXml.replace(
         /<BasePath>.*<\/BasePath>/,
-        `<BasePath>/${basepath}</BasePath>`
+        `<BasePath>/${basepath}</BasePath>`,
       );
 
       // 4. Update file in ZIP
@@ -332,16 +414,19 @@ const SendProxyToOrg = async (orgId, proxyName, token, proxyBundle, basepath) =>
     }
 
     //create the proxy
-    const createResponse = await axios({
-      method: 'POST',
-      url: `https://apigee.googleapis.com/v1/organizations/${orgId}/apis?action=import&name=${proxyName}`,
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/octet-stream'
+    const createResponse = await callApigee(
+      {
+        method: "POST",
+        url: `https://apigee.googleapis.com/v1/organizations/${orgId}/apis?action=import&name=${proxyName}`,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/octet-stream",
+        },
+        data: updatedBundle,
+        timeout: 30000, // Longer timeout for proxy import
       },
-      data: updatedBundle,
-      timeout: 30000 // Longer timeout for proxy import
-    });
+      { orgId, proxyName },
+    );
 
     console.log(`Successfully imported proxy ${proxyName} to ${orgId}`);
     return createResponse.data;
@@ -356,38 +441,56 @@ const SendProxyToOrg = async (orgId, proxyName, token, proxyBundle, basepath) =>
   }
 };
 
-const DeployProxyinOrg = async (targetOrgId, newProxyName, token, environment) => {
-  console.log(`Deploying proxy ${newProxyName} to environment ${environment} in organization ${targetOrgId}`);
+const DeployProxyinOrg = async (
+  targetOrgId,
+  newProxyName,
+  token,
+  environment,
+) => {
+  console.log(
+    `Deploying proxy ${newProxyName} to environment ${environment} in organization ${targetOrgId}`,
+  );
 
-  if (!token || token.trim() === '') {
-    throw new Error('Authentication token is required');
+  if (!token || token.trim() === "") {
+    throw new Error("Authentication token is required");
   }
 
   let latestRevision;
   try {
-    latestRevision = await fetchLatestRevision(targetOrgId, newProxyName, token);
+    latestRevision = await fetchLatestRevision(
+      targetOrgId,
+      newProxyName,
+      token,
+    );
   } catch (error) {
     throw error;
   }
 
   try {
-    const deployResponse = await axios({
-      method: 'POST',
-      url: `https://apigee.googleapis.com/v1/organizations/${targetOrgId}/environments/${environment}/apis/${newProxyName}/revisions/${latestRevision}/deployments`,
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
+    const deployResponse = await callApigee(
+      {
+        method: "POST",
+        url: `https://apigee.googleapis.com/v1/organizations/${targetOrgId}/environments/${environment}/apis/${newProxyName}/revisions/${latestRevision}/deployments`,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        timeout: 30000,
       },
-      timeout: 30000
-    });
+      {
+        orgId: targetOrgId,
+        proxyName: newProxyName,
+        environment,
+        revision: latestRevision,
+      },
+    );
 
     return {
       success: true,
       environment,
       revision: latestRevision,
-      deployment: deployResponse.data
+      deployment: deployResponse.data,
     };
-
   } catch (error) {
     console.error(`Error deploying proxy ${newProxyName}:`, error.message);
 
@@ -402,7 +505,6 @@ const DeployProxyinOrg = async (targetOrgId, newProxyName, token, environment) =
   }
 };
 
-
 //------proxy to gitlab ------
 /**
  * Fetch GitLab project ID using project name
@@ -411,16 +513,18 @@ const DeployProxyinOrg = async (targetOrgId, newProxyName, token, environment) =
  * @returns {Promise<number>} - Project ID
  */
 const getGitlabProjectId = async (proxyName, token) => {
-  const response = await axios.get('https://gitlab.com/api/v4/groups/103848084/projects', {
-    headers: { 'PRIVATE-TOKEN': token },
-    params: { search: proxyName }
-  });
+  const response = await axios.get(
+    "https://gitlab.com/api/v4/groups/103848084/projects",
+    {
+      headers: { "PRIVATE-TOKEN": token },
+      params: { search: proxyName },
+    },
+  );
 
-  const project = response.data.find(p => p.name === proxyName);
+  const project = response.data.find((p) => p.name === proxyName);
   if (!project) throw new Error(`Project ${proxyName} not found in GitLab`);
   return project.id;
 };
-
 
 /**
  * Create a new project in GitLab if it doesn’t exist
@@ -432,30 +536,31 @@ const createGitlabProjectforProxy = async (proxyName, token) => {
   try {
     console.log(`Creating new GitLab project: ${proxyName}`);
     const response = await axios.post(
-      'https://gitlab.com/api/v4/projects',
+      "https://gitlab.com/api/v4/projects",
       {
         name: proxyName,
-        namespace_id: 103848084,    //STATIC VALUE
-        group_with_project_templates_id: 105265772,     //STATIC VALUE
+        namespace_id: 103848084, //STATIC VALUE
+        group_with_project_templates_id: 105265772, //STATIC VALUE
         use_custom_template: true,
-        template_project_id: 68728494
+        template_project_id: 68728494,
       },
       {
         headers: {
-          'PRIVATE-TOKEN': token,
-          'Content-Type': 'application/json'
+          "PRIVATE-TOKEN": token,
+          "Content-Type": "application/json",
         },
-      }
+      },
     );
     console.log(`✅ Created project ${proxyName} with ID ${response.data.id}`);
     return response.data.id;
   } catch (error) {
-    console.error('❌ Failed to create GitLab project:', error.response?.data || error.message);
+    console.error(
+      "❌ Failed to create GitLab project:",
+      error.response?.data || error.message,
+    );
     throw error;
   }
 };
-
-
 
 /**
  * Upload project to GitLab
@@ -465,12 +570,17 @@ const createGitlabProjectforProxy = async (proxyName, token) => {
  * @param {string} commitMessage - Optional commit message from user
  * @returns {Promise<Object>} - Upload response { success, projectId, username, gitlabProjectUrl }
  */
-const sendProxyToGitlab = async (proxyName, token, proxyBundle, commitMessage) => {
+const sendProxyToGitlab = async (
+  proxyName,
+  token,
+  proxyBundle,
+  commitMessage,
+) => {
   try {
     console.log(`🔍 Checking for GitLab project: ${proxyName}`);
 
     // Get username
-    let usernameToUse = 'unknown';
+    let usernameToUse = "unknown";
     try {
       usernameToUse = await getGitUser(token);
     } catch (err) {
@@ -488,12 +598,16 @@ const sendProxyToGitlab = async (proxyName, token, proxyBundle, commitMessage) =
       console.log(`🚀 Creating new GitLab project: ${proxyName}`);
       projectId = await createGitlabProjectforProxy(proxyName, token);
       isNewProject = true;
-      console.log(`✅ New project created (ID: ${projectId}) — base branch 'prod-public' will be auto-created`);
+      console.log(
+        `✅ New project created (ID: ${projectId}) — base branch 'prod-public' will be auto-created`,
+      );
     }
 
     if (isNewProject) {
       await waitForRepoReady(projectId, token);
-      console.log('⏳ Repository initialization confirmed — proceeding to create branches...');
+      console.log(
+        "⏳ Repository initialization confirmed — proceeding to create branches...",
+      );
     }
 
     const baseBranch = "prod-public";
@@ -505,15 +619,17 @@ const sendProxyToGitlab = async (proxyName, token, proxyBundle, commitMessage) =
       try {
         await axios.get(
           `https://gitlab.com/api/v4/projects/${projectId}/repository/branches/${encodeURIComponent(itbranch)}`,
-          { headers: { "PRIVATE-TOKEN": token } }
+          { headers: { "PRIVATE-TOKEN": token } },
         );
         console.log(`✅ Branch '${itbranch}' exists`);
       } catch {
-        console.log(`⚠️ Branch '${itbranch}' missing — creating from '${baseBranch}'`);
+        console.log(
+          `⚠️ Branch '${itbranch}' missing — creating from '${baseBranch}'`,
+        );
         await axios.post(
           `https://gitlab.com/api/v4/projects/${projectId}/repository/branches`,
           { branch: itbranch, ref: baseBranch },
-          { headers: { "PRIVATE-TOKEN": token } }
+          { headers: { "PRIVATE-TOKEN": token } },
         );
       }
     }
@@ -522,12 +638,18 @@ const sendProxyToGitlab = async (proxyName, token, proxyBundle, commitMessage) =
     // Fetch project info
     let gitlabProjectUrl;
     try {
-      const projResp = await axios.get(`https://gitlab.com/api/v4/projects/${projectId}`, {
-        headers: { 'PRIVATE-TOKEN': token }
-      });
+      const projResp = await axios.get(
+        `https://gitlab.com/api/v4/projects/${projectId}`,
+        {
+          headers: { "PRIVATE-TOKEN": token },
+        },
+      );
       gitlabProjectUrl = projResp.data.web_url;
     } catch (err) {
-      console.warn('Could not fetch project info to get web_url:', err.message || err);
+      console.warn(
+        "Could not fetch project info to get web_url:",
+        err.message || err,
+      );
     }
 
     // Unzip bundle in memory
@@ -539,7 +661,7 @@ const sendProxyToGitlab = async (proxyName, token, proxyBundle, commitMessage) =
     for (const entry of entries) {
       if (entry.isDirectory) continue;
 
-      const repoPath = entry.entryName.replace(/\\/g, '/');
+      const repoPath = entry.entryName.replace(/\\/g, "/");
       //const fileUrl = `https://gitlab.com/api/v4/projects/${projectId}/repository/files/${encodeURIComponent(repoPath)}`;
       //const content = entry.getData().toString('base64');
       const rawData = entry.getData();
@@ -549,7 +671,7 @@ const sendProxyToGitlab = async (proxyName, token, proxyBundle, commitMessage) =
       try {
         await axios.get(
           `https://gitlab.com/api/v4/projects/${projectId}/repository/files/${encodeURIComponent(repoPath)}?ref=${uploadBranch}`,
-          { headers: { "PRIVATE-TOKEN": token } }
+          { headers: { "PRIVATE-TOKEN": token } },
         );
       } catch {
         exists = false;
@@ -575,9 +697,10 @@ const sendProxyToGitlab = async (proxyName, token, proxyBundle, commitMessage) =
     const commitUrl = `https://gitlab.com/api/v4/projects/${projectId}/repository/commits`;
 
     // Use custom commit message if provided, otherwise use default
-    const finalCommitMessage = commitMessage && commitMessage.trim()
-      ? `${commitMessage.trim()} ${proxyName} - by ${usernameToUse}`
-      : `${proxyName} - by ${usernameToUse}`;
+    const finalCommitMessage =
+      commitMessage && commitMessage.trim()
+        ? `${commitMessage.trim()} ${proxyName} - by ${usernameToUse}`
+        : `${proxyName} - by ${usernameToUse}`;
 
     const commitResp = await axios.post(
       commitUrl,
@@ -586,58 +709,68 @@ const sendProxyToGitlab = async (proxyName, token, proxyBundle, commitMessage) =
         commit_message: finalCommitMessage,
         actions,
       },
-      { headers: { 'PRIVATE-TOKEN': token } }
+      { headers: { "PRIVATE-TOKEN": token } },
     );
 
     console.log(`✅ Single commit created: ${commitResp.data.id}`);
-    return { success: true, projectId, username: usernameToUse, gitlabProjectUrl, commitId: commitResp.data.id };
-
-
+    return {
+      success: true,
+      projectId,
+      username: usernameToUse,
+      gitlabProjectUrl,
+      commitId: commitResp.data.id,
+    };
   } catch (error) {
-    console.error('❌ Error uploading proxy:', error.response?.data || error.message);
+    console.error(
+      "❌ Error uploading proxy:",
+      error.response?.data || error.message,
+    );
     throw error;
   }
 };
 
-
 async function waitForRepoReady(projectId, token) {
   const maxAttempts = 10; // retry up to 10 times
-  const delay = ms => new Promise(res => setTimeout(res, ms));
+  const delay = (ms) => new Promise((res) => setTimeout(res, ms));
 
   for (let i = 0; i < maxAttempts; i++) {
     try {
       const resp = await axios.get(
         `https://gitlab.com/api/v4/projects/${projectId}/repository/branches`,
-        { headers: { 'PRIVATE-TOKEN': token } }
+        { headers: { "PRIVATE-TOKEN": token } },
       );
       if (Array.isArray(resp.data)) {
         console.log(`✅ Repo ready after ${i + 1} attempt(s).`);
         return;
       }
     } catch {
-      console.log(`⏳ Waiting for GitLab repo to initialize... (${i + 1}/${maxAttempts})`);
+      console.log(
+        `⏳ Waiting for GitLab repo to initialize... (${i + 1}/${maxAttempts})`,
+      );
     }
     await delay(3000); // wait 3 seconds between tries
   }
 
-  throw new Error('❌ Repository did not become ready in time.');
+  throw new Error("❌ Repository did not become ready in time.");
 }
 
 //get user from git
 const getGitUser = async (token) => {
   try {
     console.log(`Looking for git user`);
-    const response = await axios.get('https://gitlab.com/api/v4/user', {
-      headers: { 'PRIVATE-TOKEN': token },
+    const response = await axios.get("https://gitlab.com/api/v4/user", {
+      headers: { "PRIVATE-TOKEN": token },
     });
     console.log(`Found git user: ${response.data.username}`);
     return response.data.username;
   } catch (error) {
-    console.error('Error fetching git user:', error.response?.data || error.message);
+    console.error(
+      "Error fetching git user:",
+      error.response?.data || error.message,
+    );
     throw error;
   }
 };
-
 
 /**
  * Fetch deployments for a proxy from Apigee API
@@ -649,22 +782,28 @@ const getGitUser = async (token) => {
 const fetchProxyDeployments = async (orgId, proxyName, token) => {
   console.log(`Fetching deployments for proxy ${proxyName} in org ${orgId}`);
 
-  if (!token || token.trim() === '') {
-    throw new Error('Authentication token is required');
+  if (!token || token.trim() === "") {
+    throw new Error("Authentication token is required");
   }
 
   try {
-    const response = await axios({
-      method: 'GET',
-      url: `https://apigee.googleapis.com/v1/organizations/${orgId}/apis/${proxyName}/deployments`,
-      headers: {
-        'Authorization': `Bearer ${token}`,
+    const response = await callApigee(
+      {
+        method: "GET",
+        url: `https://apigee.googleapis.com/v1/organizations/${orgId}/apis/${proxyName}/deployments`,
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        timeout: 20000,
       },
-      timeout: 20000,
-    });
+      { orgId, proxyName },
+    );
 
     const data = response.data;
-    console.log('Apigee deployments raw response:', JSON.stringify(data, null, 2));
+    console.log(
+      "Apigee deployments raw response:",
+      JSON.stringify(data, null, 2),
+    );
 
     // Apigee response shape:
     // {
@@ -679,11 +818,11 @@ const fetchProxyDeployments = async (orgId, proxyName, token) => {
     const deployments = [];
     if (data && Array.isArray(data.deployments)) {
       for (const item of data.deployments) {
-        const environment = item.environment || 'unknown';
+        const environment = item.environment || "unknown";
         // In your tenant, Apigee returns a flat list with 'revision' per environment (no state field)
         // Treat presence of an entry with a revision as Deployed
         const isDeployed = !!item.revision;
-        const status = isDeployed ? 'Deployed' : 'Not Deployed';
+        const status = isDeployed ? "Deployed" : "Not Deployed";
         const revision = item.revision || null;
         deployments.push({ environment, status, revision });
       }
@@ -691,7 +830,10 @@ const fetchProxyDeployments = async (orgId, proxyName, token) => {
 
     return deployments;
   } catch (error) {
-    console.error(`Error fetching deployments for ${proxyName}:`, error.message);
+    console.error(
+      `Error fetching deployments for ${proxyName}:`,
+      error.message,
+    );
     const statusCode = error.response?.status || 500;
     const errorMessage = error.response?.data?.error?.message || error.message;
     const enhancedError = new Error(errorMessage);
@@ -701,7 +843,6 @@ const fetchProxyDeployments = async (orgId, proxyName, token) => {
   }
 };
 
-
 /** Fetch all proxies from an organization using Apigee API
  * @param {string} sourceOrg - Source organization ID
  * @returns {Promise<Array>} - List of proxy names
@@ -709,16 +850,18 @@ const fetchProxyDeployments = async (orgId, proxyName, token) => {
 const fetchAllProxies = async (sourceOrg, token) => {
   const url = `https://apigee.googleapis.com/v1/organizations/${sourceOrg}/apis`;
 
-  const res = await axios.get(url, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const res = await callApigee(
+    {
+      method: "GET",
+      url,
+      headers: { Authorization: `Bearer ${token}` },
+    },
+    { orgId: sourceOrg },
+  );
 
   //res.data is typically an array of proxy names
   return res.data;
 };
-
-
-
 
 //------product to gitlab ------
 
@@ -732,30 +875,122 @@ const createGitlabProjectforProduct = async (productName, token) => {
   try {
     console.log(`Creating new GitLab project: ${productName}`);
     const response = await axios.post(
-      'https://gitlab.com/api/v4/projects',
+      "https://gitlab.com/api/v4/projects",
       {
         name: productName,
-        namespace_id: 105945867,    //STATIC VALUE
-        group_with_project_templates_id: 106119093,     //STATIC VALUE
+        namespace_id: 105945867, //STATIC VALUE
+        group_with_project_templates_id: 106119093, //STATIC VALUE
         use_custom_template: true,
-        template_project_id: 69176428       //Static Value
+        template_project_id: 69176428, //Static Value
       },
       {
         headers: {
-          'PRIVATE-TOKEN': token,
-          'Content-Type': 'application/json'
+          "PRIVATE-TOKEN": token,
+          "Content-Type": "application/json",
         },
-      }
+      },
     );
-    console.log(`✅ Created project ${productName} with ID ${response.data.id}`);
+    console.log(` Created project ${productName} with ID ${response.data.id}`);
     return response.data.id;
   } catch (error) {
-    console.error('❌ Failed to create GitLab project:', error.response?.data || error.message);
+    console.error(
+      " Failed to create GitLab project:",
+      error.response?.data || error.message,
+    );
     throw error;
   }
 };
+/**
+ * Update an existing product in an organization using Apigee API
+ * @param {string} orgId - Organization ID
+ * @param {string} productId - Product name/ID to update
+ * @param {Object} updateData - Fields to update
+ * @param {string} token - Authentication token
+ * @returns {Promise<Object>} - Updated product data
+ */
+const updateProductInOrg = async (orgId, productId, updateData, token) => {
+  console.log(`Updating product ${productId} in organization ${orgId}`);
+  console.log("Update data:", updateData);
 
-const pushProductToGitlab = async (productName, token, productData, environments = []) => {
+  if (!token || token.trim() === "") {
+    throw new Error("Authentication token is required");
+  }
+
+  try {
+    const response = await callApigee(
+      {
+        method: "PUT",
+        url: `https://apigee.googleapis.com/v1/organizations/${orgId}/apiproducts/${productId}`,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        data: updateData,
+      },
+      { orgId, productName: productId },
+    );
+
+    console.log("Successfully updated product:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error(`Error updating product ${productId}:`, error.message);
+
+    const statusCode = error.response?.status || 500;
+    const errorMessage = error.response?.data?.error?.message || error.message;
+
+    const enhancedError = new Error(errorMessage);
+    enhancedError.status = statusCode;
+    enhancedError.details = error.response?.data;
+
+    throw enhancedError;
+  }
+};
+/**
+ * Fetch all revisions of a proxy from an organization using Apigee API (raw list, not just latest)
+ * @param {string} orgId - Organization ID
+ * @param {string} proxyName - Proxy name
+ * @param {string} token - Authentication token
+ * @returns {Promise<Array>} - List of revision numbers as strings, e.g. ["1","2","3"]
+ */
+const fetchProxyRevisions = async (orgId, proxyName, token) => {
+  console.log(`Fetching revisions of ${proxyName} from organization ${orgId}`);
+
+  if (!token || token.trim() === "") {
+    throw new Error("Authentication token is required");
+  }
+
+  try {
+    const response = await callApigee(
+      {
+        method: "GET",
+        url: `https://apigee.googleapis.com/v1/organizations/${orgId}/apis/${proxyName}/revisions`,
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        timeout: 30000,
+      },
+      { orgId, proxyName },
+    );
+
+    return response.data; // e.g. ["1", "2", "3"]
+  } catch (error) {
+    const statusCode = error.response?.status || 500;
+    const errorMessage = error.response?.data?.error?.message || error.message;
+
+    const enhancedError = new Error(errorMessage);
+    enhancedError.status = statusCode;
+    enhancedError.details = error.response?.data;
+
+    throw enhancedError;
+  }
+};
+
+const pushProductToGitlab = async (
+  productName,
+  token,
+  productData,
+  environments = [],
+) => {
   try {
     console.log(`🔍 Checking for GitLab project: ${productName}`);
 
@@ -765,7 +1000,7 @@ const pushProductToGitlab = async (productName, token, productData, environments
       usernameToUse = await getGitUser(token);
     } catch (err) {
       console.warn('Could not fetch GitLab user, proceeding with "unknown"');
-      usernameToUse = 'unknown';
+      usernameToUse = "unknown";
     }
 
     // Step 1: Get or create project
@@ -779,12 +1014,16 @@ const pushProductToGitlab = async (productName, token, productData, environments
       console.log(`🚀 Creating new GitLab project: ${productName}`);
       projectId = await createGitlabProjectforProduct(productName, token);
       isNewProject = true;
-      console.log(`✅ New project created (ID: ${projectId}) — base branch 'prod' will be auto-created`);
+      console.log(
+        `✅ New project created (ID: ${projectId}) — base branch 'prod' will be auto-created`,
+      );
     }
 
     if (isNewProject) {
       await waitForRepoReady(projectId, token);
-      console.log('⏳ Repository initialization confirmed — proceeding to create branches...');
+      console.log(
+        "⏳ Repository initialization confirmed — proceeding to create branches...",
+      );
     }
 
     const baseBranch = "prod";
@@ -795,18 +1034,20 @@ const pushProductToGitlab = async (productName, token, productData, environments
     try {
       await axios.get(
         `https://gitlab.com/api/v4/projects/${projectId}/repository/branches/${encodeURIComponent(uploadBranch)}`,
-        { headers: { 'PRIVATE-TOKEN': token } }
+        { headers: { "PRIVATE-TOKEN": token } },
       );
 
       console.log(`✅ Branch '${uploadBranch}' exists`);
-    } catch {    //if not exist create from prod
-      console.log(`⚠️ Branch '${uploadBranch}' missing — creating from '${baseBranch}'`);
+    } catch {
+      //if not exist create from prod
+      console.log(
+        `⚠️ Branch '${uploadBranch}' missing — creating from '${baseBranch}'`,
+      );
 
       await axios.post(
         `https://gitlab.com/api/v4/projects/${projectId}/repository/branches`,
         { branch: uploadBranch, ref: baseBranch },
-        { headers: { 'PRIVATE-TOKEN': token } }
-
+        { headers: { "PRIVATE-TOKEN": token } },
       );
       console.log(`⚠️ Branch '${uploadBranch}' created from '${baseBranch}'`);
     }
@@ -817,7 +1058,7 @@ const pushProductToGitlab = async (productName, token, productData, environments
       try {
         await axios.get(
           `https://gitlab.com/api/v4/projects/${projectId}/repository/branches/${encodeURIComponent(env)}`,
-          { headers: { 'PRIVATE-TOKEN': token } }
+          { headers: { "PRIVATE-TOKEN": token } },
         );
         console.log(`✅ Branch '${env}' exists`);
       } catch {
@@ -825,7 +1066,7 @@ const pushProductToGitlab = async (productName, token, productData, environments
         await axios.post(
           `https://gitlab.com/api/v4/projects/${projectId}/repository/branches`,
           { branch: env, ref: baseBranch },
-          { headers: { 'PRIVATE-TOKEN': token } }
+          { headers: { "PRIVATE-TOKEN": token } },
         );
       }
     }
@@ -837,11 +1078,14 @@ const pushProductToGitlab = async (productName, token, productData, environments
     try {
       const projResp = await axios.get(
         `https://gitlab.com/api/v4/projects/${projectId}`,
-        { headers: { 'PRIVATE-TOKEN': token } }
+        { headers: { "PRIVATE-TOKEN": token } },
       );
       gitlabProjectUrl = projResp.data.web_url;
     } catch (err) {
-      console.warn('Could not fetch project info to get web_url:', err.message || err);
+      console.warn(
+        "Could not fetch project info to get web_url:",
+        err.message || err,
+      );
     }
 
     // Prepare JSON data
@@ -852,17 +1096,28 @@ const pushProductToGitlab = async (productName, token, productData, environments
     // paths inside product-artifact
     const folders = ["dev", "uat", "prod"];
 
-    // Build actions array (same structure as proxy)
+    // Build actions array — check per-file whether it already exists on this branch,
+    // same pattern as sendProxyToGitlab uses for proxies
     const actions = [];
 
     for (const folder of folders) {
       const repoPath = `product-artifact/${folder}/create-update-product.json`;
 
+      let exists = true;
+      try {
+        await axios.get(
+          `https://gitlab.com/api/v4/projects/${projectId}/repository/files/${encodeURIComponent(repoPath)}?ref=${uploadBranch}`,
+          { headers: { "PRIVATE-TOKEN": token } },
+        );
+      } catch {
+        exists = false;
+      }
+
       actions.push({
-        action: "update",                 // or "update" if needed
+        action: exists ? "update" : "create",
         file_path: repoPath,
         content: base64Data,
-        encoding: "base64"
+        encoding: "base64",
       });
     }
 
@@ -874,11 +1129,11 @@ const pushProductToGitlab = async (productName, token, productData, environments
     const commitResp = await axios.post(
       commitUrl,
       {
-        branch: uploadBranch,   // always dev
+        branch: uploadBranch, // always dev
         commit_message: `Upload product JSON for ${productName} by ${usernameToUse} (${timestamp})`,
-        actions
+        actions,
       },
-      { headers: { "PRIVATE-TOKEN": token } }
+      { headers: { "PRIVATE-TOKEN": token } },
     );
 
     console.log(`✅ Single commit created: ${commitResp.data.id}`);
@@ -888,20 +1143,16 @@ const pushProductToGitlab = async (productName, token, productData, environments
       projectId,
       username: usernameToUse,
       gitlabProjectUrl,
-      commitId: commitResp.data.id
+      commitId: commitResp.data.id,
     };
   } catch (error) {
-    console.error('❌ Error uploading proxy:', error.response?.data || error.message);
+    console.error(
+      "❌ Error uploading product:",
+      error.response?.data || error.message,
+    );
     throw error;
   }
-}
-
-
-
-
-
-
-
+};
 
 // Export functions with clear naming (placed after all definitions)
 module.exports = {
@@ -911,7 +1162,7 @@ module.exports = {
   createProductInOrg,
   createGitlabProjectforProduct,
   pushProductToGitlab,
-
+  fetchProxyRevisions,
   fetchProxyFromOrg,
   SendProxyToOrg,
   DeployProxyinOrg,
@@ -920,6 +1171,8 @@ module.exports = {
   fetchLatestRevision,
   fetchProxyDeployments,
   fetchAllProxies,
+
+  updateProductInOrg,
 
   getGitlabProjectId,
   getGitUser,

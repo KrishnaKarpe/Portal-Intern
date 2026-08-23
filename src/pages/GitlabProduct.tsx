@@ -333,6 +333,13 @@ const GitlabProduct: React.FC = () => {
                         placeholder="Existing product in Apigee"
                         value={formData.productName}
                         onChange={handleProductNameChange}
+                        onFocus={() => {
+                          if (allProducts.length > 0) {
+                            setProductSuggestions(allProducts);
+                            setShowProductSuggestions(true);
+                          }
+                        }}
+                        onBlur={() => setTimeout(() => setShowProductSuggestions(false), 150)}
                       />
                       {showProductSuggestions && productSuggestions.length > 0 && (
                         <ul className="absolute z-10 w-full bg-white border border-gray-300 mt-1 max-h-48 overflow-y-auto rounded-md shadow-lg">
@@ -340,7 +347,8 @@ const GitlabProduct: React.FC = () => {
                             <li
                               key={name}
                               className="px-3 py-2 hover:bg-blue-100 cursor-pointer"
-                              onClick={() => {
+                              onMouseDown={(e) => {
+                                e.preventDefault();
                                 setFormData((prev) => ({ ...prev, productName: name }));
                                 setShowProductSuggestions(false);
                               }}
@@ -387,7 +395,7 @@ const GitlabProduct: React.FC = () => {
                           </TableCell>
                           <TableCell className="text-gray-900">
                             {productDetails.environments &&
-                            productDetails.environments.length > 0
+                              productDetails.environments.length > 0
                               ? productDetails.environments.join(', ')
                               : '—'}
                           </TableCell>
@@ -447,7 +455,7 @@ const GitlabProduct: React.FC = () => {
                                     </TableCell>
                                     <TableCell className="text-gray-900">
                                       {operation.methods &&
-                                      operation.methods.length > 0
+                                        operation.methods.length > 0
                                         ? operation.methods.join(', ')
                                         : '—'}
                                     </TableCell>
@@ -506,20 +514,36 @@ const GitlabProduct: React.FC = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                                      <label className="text-sm font-medium text-gray-700">Group Name *</label>
-                                      <Select
-                                        value={formData.template}
-                                        onValueChange={(value) => setFormData((prev) => ({ ...prev, template: value }))}
-                                      >
-                                        <SelectTrigger>
-                                          <SelectValue placeholder="Select template" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          <SelectItem value="apigee-cicd">Product</SelectItem>
-                                        </SelectContent>
-                                      </Select>
-                                    </div>
+                    <label className="text-sm font-medium text-gray-700">Group Name *</label>
+                    <Select
+                      value={formData.gitlabGroupName}
+                      onValueChange={(value) => setFormData((prev) => ({ ...prev, gitlabGroupName: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select group" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="apigee-cicd">Product</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
+
+                {/* <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Group Name *</label>
+                  <Select
+                    value={formData.template}
+                    onValueChange={(value) => setFormData((prev) => ({ ...prev, template: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select template" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="apigee-cicd">Product</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div> */}
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
@@ -597,11 +621,10 @@ const GitlabProduct: React.FC = () => {
                     type="button"
                     onClick={onPushProductToGitlab}
                     disabled={isLoading}
-                    className={`w-full font-semibold focus:outline-none focus:ring-2 py-3 text-lg transition-all duration-300 ${
-                      buttonAnimationPhase === 'phase2'
-                        ? 'bg-green-500 text-white hover:bg-green-600'
-                        : 'bg-amber-500 text-white hover:bg-amber-600 focus:ring-amber-400'
-                    }`}
+                    className={`w-full font-semibold focus:outline-none focus:ring-2 py-3 text-lg transition-all duration-300 ${buttonAnimationPhase === 'phase2'
+                      ? 'bg-green-500 text-white hover:bg-green-600'
+                      : 'bg-amber-500 text-white hover:bg-amber-600 focus:ring-amber-400'
+                      }`}
                   >
                     {isLoading ? (
                       <>
@@ -728,7 +751,7 @@ const GitlabProduct: React.FC = () => {
           </motion.div>
         )}
       </motion.div>
-    </div>
+    </div >
   );
 };
 
